@@ -1,3 +1,10 @@
+export type Profile = {
+	id: number;
+	name: string;
+	color: string;
+	created_at: string;
+};
+
 export type Project = {
 	id: number;
 	name: string;

@@ -7,7 +7,7 @@
 	import EditEntryDialog from '$lib/components/edit-entry-dialog.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { dayLabel, formatHours } from '$lib/format';
-	import { fadeUp, slideIn, smooth, spring } from '$lib/motion';
+	import { fadeUpSubtle, listItem, smooth, spring, stagger, tapSubtle } from '$lib/motion';
 	import type { TimeEntry } from '$lib/types';
 
 	type Props = {
@@ -39,6 +39,10 @@
 		return [...byDate.values()];
 	});
 
+	function isToday(date: string) {
+		return date === today;
+	}
+
 	function openEdit(entry: TimeEntry) {
 		activeEntry = entry;
 		editOpen = true;
@@ -52,85 +56,124 @@
 
 <div class="grid gap-4">
 	<AnimatePresence>
-		{#each groups as group (group.date)}
-			<motion.section key={group.date} {...fadeUp} transition={smooth} layout>
-				<div
-					class="sticky top-0 z-10 mb-0.5 flex items-baseline justify-between gap-3 rounded-md bg-background/70 px-2 py-1 backdrop-blur-sm"
+		{#each groups as group, groupIndex (group.date)}
+			<motion.section
+				key={group.date}
+				{...fadeUpSubtle}
+				transition={{ ...smooth, delay: stagger(groupIndex, 0.04) }}
+				layout
+			>
+				<motion.div
+					class="sticky top-0 z-10 mb-1.5 flex items-center gap-3 bg-background/80 py-1.5 backdrop-blur-md"
+					initial={{ opacity: 0, x: -4 }}
+					animate={{ opacity: 1, x: 0 }}
+					transition={{ ...smooth, delay: stagger(groupIndex, 0.04) + 0.02 }}
 				>
-					<span class="font-mono text-[0.68rem] tracking-[0.14em] text-muted-foreground uppercase">
+					<span
+						class="font-mono text-[0.68rem] font-medium tracking-[0.16em] uppercase {isToday(
+							group.date
+						)
+							? 'text-primary'
+							: 'text-muted-foreground'}"
+					>
 						{dayLabel(group.date, today)}
 					</span>
-					<span class="font-mono text-xs text-muted-foreground tabular-nums">
+					<span class="h-px flex-1 bg-border"></span>
+					<motion.span
+						class="font-mono text-xs text-muted-foreground tabular-nums"
+						key={group.total}
+						initial={{ opacity: 0.5, y: 2 }}
+						animate={{ opacity: 1, y: 0 }}
+						transition={smooth}
+					>
 						{formatHours(group.total)}h
-					</span>
-				</div>
+					</motion.span>
+				</motion.div>
 
-				<ul class="m-0 list-none overflow-hidden rounded-lg border border-border/70 bg-card/50 p-0">
+				<ul class="panel m-0 list-none overflow-hidden p-0">
 					<AnimatePresence>
-						{#each group.items as entry (entry.id)}
+						{#each group.items as entry, entryIndex (entry.id)}
 							<motion.li
 								key={entry.id}
-								{...slideIn}
-								transition={spring}
+								{...listItem}
+								transition={{
+									...spring,
+									delay: stagger(groupIndex * 3 + entryIndex, 0.025)
+								}}
 								layout
-								class="group/entry flex items-start gap-3 border-b border-border/50 px-2.5 py-2 last:border-b-0"
+								whileHover={{ backgroundColor: 'oklch(0.93 0.02 85 / 3.5%)' }}
+								class="group/entry relative flex items-center gap-3 border-b border-border/50 py-2.5 pr-2 pl-3.5 last:border-b-0"
 							>
 								<span
-									class="w-9 shrink-0 pt-0.5 text-right font-mono text-sm font-semibold text-primary tabular-nums"
+									class="absolute inset-y-1.5 left-0 w-[3px] rounded-full opacity-70 transition-opacity group-hover/entry:opacity-100"
+									style={`background: ${entry.project_color}`}
+									aria-hidden="true"
+								></span>
+
+								<motion.span
+									class="shrink-0 rounded-md bg-primary/10 px-1.5 py-1 text-center font-mono text-sm leading-none font-semibold text-primary tabular-nums"
+									initial={{ opacity: 0, scale: 0.95 }}
+									animate={{ opacity: 1, scale: 1 }}
+									transition={{ ...spring, delay: stagger(entryIndex, 0.02) }}
 								>
 									{formatHours(entry.hours)}h
-								</span>
+								</motion.span>
 
-								<div class="min-w-0 flex-1">
+								<div class="grid min-w-0 flex-1 gap-0.5">
 									{#if showProject}
-										<div class="flex items-center gap-1.5 text-sm font-medium">
-											<span
-												class="size-2 shrink-0 rounded-full"
-												style:background={entry.project_color}
-											></span>
-											<span class="truncate">{entry.project_name}</span>
-										</div>
+										<span
+											class="truncate text-[0.7rem] font-medium tracking-wide text-muted-foreground"
+										>
+											{entry.project_name}
+										</span>
 									{/if}
 
 									{#if entry.comment}
-										<p class="m-0 text-sm leading-snug whitespace-pre-wrap text-foreground/80">
+										<p class="m-0 text-sm leading-snug whitespace-pre-wrap text-foreground/85">
 											{entry.comment}
 										</p>
 									{:else if !showProject}
-										<p class="m-0 text-sm text-muted-foreground/60 italic">No note</p>
+										<p class="m-0 text-sm text-muted-foreground/50 italic">No note</p>
 									{/if}
 								</div>
 
-								<div
-									class="flex shrink-0 gap-0.5 opacity-100 transition-opacity focus-within:opacity-100 sm:opacity-0 sm:group-hover/entry:opacity-100"
+								<motion.div
+									class="flex shrink-0 gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/entry:opacity-100 sm:group-focus-within/entry:opacity-100"
+									initial={{ opacity: 0, x: 4 }}
+									animate={{ opacity: 1, x: 0 }}
+									transition={{ ...smooth, delay: 0.08 }}
 								>
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon-xs"
-										title={entry.comment ? 'Edit note' : 'Add note'}
-										onclick={() => openEdit(entry)}
-									>
-										{#if entry.comment}
-											<PencilIcon />
-										{:else}
-											<MessageSquarePlusIcon />
-										{/if}
-										<span class="sr-only">{entry.comment ? 'Edit note' : 'Add note'}</span>
-									</Button>
+									<motion.div whileTap={tapSubtle}>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon-xs"
+											title={entry.comment ? 'Edit note' : 'Add note'}
+											onclick={() => openEdit(entry)}
+										>
+											{#if entry.comment}
+												<PencilIcon />
+											{:else}
+												<MessageSquarePlusIcon />
+											{/if}
+											<span class="sr-only">{entry.comment ? 'Edit note' : 'Add note'}</span>
+										</Button>
+									</motion.div>
 
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon-xs"
-										title="Delete entry"
-										class="hover:text-destructive"
-										onclick={() => openDelete(entry)}
-									>
-										<Trash2Icon />
-										<span class="sr-only">Delete entry</span>
-									</Button>
-								</div>
+									<motion.div whileTap={tapSubtle}>
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon-xs"
+											title="Delete entry"
+											class="hover:text-destructive"
+											onclick={() => openDelete(entry)}
+										>
+											<Trash2Icon />
+											<span class="sr-only">Delete entry</span>
+										</Button>
+									</motion.div>
+								</motion.div>
 							</motion.li>
 						{/each}
 					</AnimatePresence>

@@ -29,8 +29,8 @@
 	--chart-3: oklch(0.68 0.1 30);
 	--chart-4: oklch(0.7 0.07 240);
 	--chart-5: oklch(0.75 0.05 70);
-	--radius: 0.9rem;
-	--sidebar: oklch(0.2 0.016 250);
+	--radius: 0.75rem;
+	--sidebar: oklch(0.19 0.016 250);
 	--sidebar-foreground: oklch(0.93 0.02 85);
 	--sidebar-primary: oklch(0.8 0.14 80);
 	--sidebar-primary-foreground: oklch(0.22 0.04 70);
@@ -44,6 +44,14 @@
 	--brass: #e8a838;
 	--brass-deep: #c4841f;
 	--ink: #0e1218;
+
+	/* Elevation — panels sit on a dark ground, so shadows stay deep and diffuse */
+	--elevation-1: 0 1px 2px rgba(0, 0, 0, 0.32);
+	--elevation-2: 0 6px 18px rgba(0, 0, 0, 0.28);
+	--elevation-3: 0 18px 44px rgba(0, 0, 0, 0.34);
+
+	/* Hairline used to separate panel sections without a full border */
+	--hairline: oklch(0.93 0.02 85 / 9%);
 }
 
 .dark {
@@ -131,9 +139,9 @@
 	body {
 		@apply bg-background text-foreground antialiased;
 		background-image:
-			radial-gradient(1200px 600px at 10% -10%, oklch(0.8 0.14 80 / 14%), transparent 55%),
-			radial-gradient(900px 500px at 100% 0%, oklch(0.72 0.08 170 / 10%), transparent 50%),
-			linear-gradient(165deg, #0e1218 0%, oklch(0.16 0.014 250) 45%, #171d27 100%);
+			radial-gradient(1100px 520px at 8% -12%, oklch(0.8 0.14 80 / 10%), transparent 58%),
+			radial-gradient(820px 460px at 100% 0%, oklch(0.72 0.08 170 / 7%), transparent 52%),
+			linear-gradient(165deg, #0e1218 0%, oklch(0.16 0.014 250) 45%, #161c25 100%);
 		background-attachment: fixed;
 		min-height: 100%;
 	}
@@ -143,19 +151,99 @@
 		position: fixed;
 		inset: 0;
 		pointer-events: none;
-		opacity: 0.035;
+		opacity: 0.022;
 		background-image: repeating-linear-gradient(
 			-18deg,
 			#fff 0,
 			#fff 1px,
 			transparent 1px,
-			transparent 10px
+			transparent 11px
 		);
+	}
+
+	/* Keyboard focus should always be obvious against the dark ground */
+	:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 2px;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		*::before,
+		*::after {
+			animation-duration: 0.01ms !important;
+			animation-iteration-count: 1 !important;
+			transition-duration: 0.01ms !important;
+			scroll-behavior: auto !important;
+		}
 	}
 }
 
 /* Custom: brass punch-clock stamp */
 @layer components {
+	/* Primary raised surface. `--panel-accent` tints the top edge with a project colour. */
+	.panel {
+		position: relative;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--border);
+		background:
+			linear-gradient(180deg, oklch(0.93 0.02 85 / 3%), transparent 40%),
+			var(--card);
+		box-shadow: var(--elevation-2);
+	}
+
+	/* Rounded top corners keep the bar inside the panel without clipping its contents */
+	.panel--accent::before {
+		content: '';
+		position: absolute;
+		inset: 0 0 auto 0;
+		height: 3px;
+		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+		background: linear-gradient(
+			90deg,
+			var(--panel-accent, var(--brass)),
+			color-mix(in srgb, var(--panel-accent, var(--brass)) 20%, transparent)
+		);
+	}
+
+	/* Grouped readouts sharing one frame, divided by hairlines */
+	.stat-strip {
+		display: flex;
+		align-items: stretch;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--border);
+		background: oklch(0.2 0.016 250 / 70%);
+		overflow: hidden;
+	}
+
+	.stat-strip__cell {
+		display: grid;
+		gap: 0.05rem;
+		padding: 0.25rem 0.6rem;
+		text-align: right;
+	}
+
+	.stat-strip__cell + .stat-strip__cell {
+		border-left: 1px solid var(--hairline);
+	}
+
+	.stat-strip__label {
+		font-family: var(--font-mono);
+		font-size: 0.5rem;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--muted-foreground);
+		line-height: 1.4;
+	}
+
+	.stat-strip__value {
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		line-height: 1.2;
+	}
+
 	.hour-stamp {
 		position: relative;
 		width: min(var(--stamp-size, 132px), 60vw);
@@ -165,26 +253,28 @@
 		cursor: pointer;
 		color: #1a1408;
 		background:
-			radial-gradient(circle at 35% 30%, #f0c266, var(--brass) 42%, var(--brass-deep) 78%);
+			radial-gradient(circle at 35% 28%, #f5cd78, var(--brass) 44%, var(--brass-deep) 80%);
 		box-shadow:
-			0 12px 30px oklch(0.8 0.14 80 / 24%),
-			inset 0 2px 0 rgba(255, 255, 255, 0.35),
-			inset 0 -8px 18px rgba(0, 0, 0, 0.18);
+			0 14px 34px oklch(0.8 0.14 80 / 26%),
+			0 0 0 1px oklch(0.8 0.14 80 / 30%),
+			inset 0 2px 0 rgba(255, 255, 255, 0.4),
+			inset 0 -10px 20px rgba(0, 0, 0, 0.2);
 		display: grid;
 		place-content: center;
 		gap: 0.1rem;
 	}
 
 	.hour-stamp:disabled {
-		opacity: 0.45;
+		opacity: 0.4;
 		cursor: not-allowed;
-		filter: grayscale(0.35);
+		filter: grayscale(0.5);
+		box-shadow: inset 0 -8px 18px rgba(0, 0, 0, 0.2);
 	}
 
 	.hour-stamp__ring {
 		position: absolute;
 		inset: 8px;
-		border: 2px dashed color-mix(in srgb, #1a1408 32%, transparent);
+		border: 2px dashed color-mix(in srgb, #1a1408 30%, transparent);
 		border-radius: 50%;
 		pointer-events: none;
 	}
@@ -213,5 +303,154 @@
 
 	.font-mono {
 		font-family: var(--font-mono);
+	}
+
+	.profile-screen {
+		display: grid;
+		min-height: 100svh;
+		place-items: center;
+		padding: 2rem 1.25rem 3rem;
+	}
+
+	.profile-screen__inner {
+		width: min(100%, 56rem);
+		text-align: center;
+	}
+
+	.profile-screen__eyebrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 0 0 1.25rem;
+		padding: 0.3rem 0.75rem;
+		border: 1px solid var(--border);
+		border-radius: 999px;
+		background: oklch(0.2 0.016 250 / 60%);
+		font-family: var(--font-mono);
+		font-size: 0.6rem;
+		letter-spacing: 0.2em;
+		text-transform: uppercase;
+		color: var(--muted-foreground);
+	}
+
+	.profile-screen__title {
+		margin: 0;
+		font-family: var(--font-display);
+		font-size: clamp(2rem, 5vw, 3rem);
+		font-weight: 700;
+		letter-spacing: -0.03em;
+	}
+
+	.profile-screen__subtitle {
+		margin: 0.75rem 0 0;
+		color: var(--muted-foreground);
+		font-size: 1rem;
+	}
+
+	.profile-screen__error {
+		margin: 1.5rem 0 0;
+		color: var(--destructive);
+	}
+
+	.profile-grid {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 1.5rem 1.75rem;
+		margin-top: 2.75rem;
+	}
+
+	.profile-grid__item {
+		width: 8.5rem;
+	}
+
+	.profile-card {
+		display: grid;
+		gap: 0.85rem;
+		width: 100%;
+		padding: 0;
+		border: 0;
+		border-radius: var(--radius-lg);
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+		text-align: center;
+	}
+
+	.profile-card:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 6px;
+	}
+
+	.profile-card__avatar-wrap {
+		display: grid;
+		place-items: center;
+	}
+
+	.profile-card__name {
+		font-size: 0.95rem;
+		font-weight: 500;
+	}
+
+	.profile-card__add-icon {
+		display: grid;
+		place-items: center;
+		width: 7rem;
+		height: 7rem;
+		margin: 0 auto;
+		border: 1px dashed oklch(0.93 0.02 85 / 20%);
+		border-radius: 1rem;
+		background: oklch(0.93 0.02 85 / 3%);
+		color: var(--muted-foreground);
+		transition:
+			background 0.2s ease,
+			color 0.2s ease;
+	}
+
+	.profile-card--add:hover .profile-card__add-icon,
+	.profile-card--add:focus-visible .profile-card__add-icon {
+		background: oklch(0.8 0.14 80 / 9%);
+		color: var(--primary);
+	}
+
+	.profile-avatar {
+		display: grid;
+		place-items: center;
+		border-radius: 1rem;
+		background: linear-gradient(
+			150deg,
+			color-mix(in srgb, var(--avatar-color) 82%, white),
+			var(--avatar-color) 55%,
+			color-mix(in srgb, var(--avatar-color) 78%, black)
+		);
+		box-shadow:
+			0 12px 28px color-mix(in srgb, var(--avatar-color) 32%, transparent),
+			inset 0 1px 0 rgba(255, 255, 255, 0.3),
+			inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+		transition: box-shadow 0.22s ease;
+	}
+
+	.profile-avatar--sm {
+		border-radius: 0.55rem;
+		box-shadow:
+			0 2px 6px color-mix(in srgb, var(--avatar-color) 28%, transparent),
+			inset 0 1px 0 rgba(255, 255, 255, 0.28);
+	}
+
+	/* Netflix-style selection ring: a gap in the page colour, then a bright edge */
+	.profile-card:hover .profile-avatar,
+	.profile-card:focus-visible .profile-avatar {
+		box-shadow:
+			0 16px 34px color-mix(in srgb, var(--avatar-color) 38%, transparent),
+			inset 0 1px 0 rgba(255, 255, 255, 0.3),
+			0 0 0 3px var(--background),
+			0 0 0 5px oklch(0.93 0.02 85 / 72%);
+	}
+
+	.profile-avatar__initials {
+		font-family: var(--font-display);
+		font-weight: 700;
+		color: rgba(20, 14, 2, 0.78);
+		letter-spacing: -0.03em;
 	}
 }

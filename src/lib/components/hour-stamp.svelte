@@ -2,7 +2,7 @@
 	import { motion } from '@humanspeak/svelte-motion';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
-	import { smooth } from '$lib/motion';
+	import { stampPulse, smooth, hoverLift, tapPress } from '$lib/motion';
 
 	type Props = HTMLButtonAttributes & {
 		pulse?: boolean;
@@ -19,17 +19,15 @@
 		type = 'submit',
 		...restProps
 	}: Props = $props();
-
-	const pulseKeyframes = { scale: [1, 0.92, 1.06, 1] };
 </script>
 
 <motion.div
 	class="inline-flex"
 	initial={false}
-	animate={pulse ? pulseKeyframes : { opacity: 1, scale: 1 }}
-	transition={pulse ? { duration: 0.45, ease: 'easeOut' } : smooth}
-	whileHover={disabled ? undefined : { scale: 1.03, y: -2 }}
-	whileTap={disabled ? undefined : { scale: 0.96, y: 1 }}
+	animate={pulse ? { scale: [...stampPulse.scale] } : { opacity: 1, scale: 1 }}
+	transition={pulse ? stampPulse.transition : smooth}
+	whileHover={disabled ? undefined : hoverLift}
+	whileTap={disabled ? undefined : tapPress}
 >
 	<button
 		{type}

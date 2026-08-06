@@ -42,12 +42,23 @@ export async function ensureSchema(): Promise<Client> {
 
 	await db.batch(
 		[
-			`CREATE TABLE IF NOT EXISTS projects (
+			`CREATE TABLE IF NOT EXISTS profiles (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				name TEXT NOT NULL UNIQUE,
 				color TEXT NOT NULL DEFAULT '#e8a838',
+				created_at TEXT NOT NULL DEFAULT (datetime('now'))
+			)`,
+			`CREATE TABLE IF NOT EXISTS projects (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL,
+				color TEXT NOT NULL DEFAULT '#e8a838',
 				created_at TEXT NOT NULL DEFAULT (datetime('now')),
 				archived_at TEXT
+			)`,
+			`CREATE TABLE IF NOT EXISTS project_profiles (
+				project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+				profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+				PRIMARY KEY (project_id, profile_id)
 			)`,
 			`CREATE TABLE IF NOT EXISTS time_entries (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +69,8 @@ export async function ensureSchema(): Promise<Client> {
 				created_at TEXT NOT NULL DEFAULT (datetime('now'))
 			)`,
 			`CREATE INDEX IF NOT EXISTS idx_time_entries_project ON time_entries(project_id)`,
-			`CREATE INDEX IF NOT EXISTS idx_time_entries_worked_on ON time_entries(worked_on)`
+			`CREATE INDEX IF NOT EXISTS idx_time_entries_worked_on ON time_entries(worked_on)`,
+			`CREATE INDEX IF NOT EXISTS idx_project_profiles_profile ON project_profiles(profile_id)`
 		],
 		'write'
 	);
@@ -70,8 +82,73 @@ export async function ensureSchema(): Promise<Client> {
 		await db.execute('ALTER TABLE projects ADD COLUMN archived_at TEXT');
 	}
 
+	await migrateExistingProjects(db);
+	await migrateDropProjectNameUnique(db);
+
 	migrated = true;
 	return db;
+}
+
+async function migrateDropProjectNameUnique(db: Client) {
+	const indexes = await db.execute(`PRAGMA index_list(projects)`);
+	let hasUniqueName = false;
+
+	for (const row of indexes.rows) {
+		if (Number(row.unique) !== 1) continue;
+		const info = await db.execute(`PRAGMA index_info('${String(row.name)}')`);
+		if (info.rows.some((col) => String(col.name) === 'name')) {
+			hasUniqueName = true;
+			break;
+		}
+	}
+
+	if (!hasUniqueName) return;
+
+	await db.execute('PRAGMA foreign_keys = OFF');
+	try {
+		await db.batch(
+			[
+				`CREATE TABLE projects_migrated (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					name TEXT NOT NULL,
+					color TEXT NOT NULL DEFAULT '#e8a838',
+					created_at TEXT NOT NULL DEFAULT (datetime('now')),
+					archived_at TEXT
+				)`,
+				`INSERT INTO projects_migrated (id, name, color, created_at, archived_at)
+					SELECT id, name, color, created_at, archived_at FROM projects`,
+				'DROP TABLE projects',
+				'ALTER TABLE projects_migrated RENAME TO projects'
+			],
+			'write'
+		);
+	} finally {
+		await db.execute('PRAGMA foreign_keys = ON');
+	}
+}
+
+async function migrateExistingProjects(db: Client) {
+	const junctionCount = (
+		await db.execute('SELECT COUNT(*) AS count FROM project_profiles')
+	).rows[0];
+	if (Number(junctionCount.count) > 0) return;
+
+	const projectCount = (await db.execute('SELECT COUNT(*) AS count FROM projects')).rows[0];
+	if (Number(projectCount.count) === 0) return;
+
+	const profileResult = await db.execute({
+		sql: `INSERT INTO profiles (name, color) VALUES (?, ?)
+			ON CONFLICT(name) DO UPDATE SET name = excluded.name
+			RETURNING id`,
+		args: ['Default', '#e8a838']
+	});
+	const profileId = Number(profileResult.rows[0].id);
+
+	await db.execute({
+		sql: `INSERT INTO project_profiles (project_id, profile_id)
+			SELECT id, ? FROM projects`,
+		args: [profileId]
+	});
 }
 
 export type { Project, TimeEntry } from '$lib/types';

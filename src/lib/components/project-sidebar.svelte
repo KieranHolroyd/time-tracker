@@ -3,6 +3,8 @@
 	import { invalidateAll } from '$app/navigation';
 	import { AnimatePresence, motion } from '@humanspeak/svelte-motion';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import DownloadIcon from '@lucide/svelte/icons/download';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import PaletteIcon from '@lucide/svelte/icons/palette';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
@@ -10,12 +12,14 @@
 	import ArchiveProjectDialog from '$lib/components/archive-project-dialog.svelte';
 	import CreateProjectDialog from '$lib/components/create-project-dialog.svelte';
 	import EditProjectDialog from '$lib/components/edit-project-dialog.svelte';
-	import { PROJECT_COLORS } from '$lib/constants';
+	import ExportDialog from '$lib/components/export-dialog.svelte';
+	import StampIcon from '@lucide/svelte/icons/stamp';
+	import { COLOR_NAMES, PROJECT_COLORS } from '$lib/constants';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { formatHours } from '$lib/format';
-	import { fadeUp, slideIn, smooth, spring } from '$lib/motion';
+	import { fadeUpSubtle, hoverSubtle, slideIn, smooth, spring, stagger, tapSubtle } from '$lib/motion';
 	import type { ProjectWithStats, Summary } from '$lib/types';
 
 	type Props = {
@@ -40,6 +44,7 @@
 
 	let editOpen = $state(false);
 	let archiveOpen = $state(false);
+	let exportOpen = $state(false);
 	let editingProject = $state<ProjectWithStats | null>(null);
 	let archivingProject = $state<ProjectWithStats | null>(null);
 
@@ -59,20 +64,31 @@
 </script>
 
 <Sidebar.Root collapsible="icon">
-	<Sidebar.Header class="gap-0.5 px-3 py-3 group-data-[collapsible=icon]:px-1.5">
-		<motion.span
-			class="font-display truncate text-xl leading-none font-bold tracking-[-0.03em] group-data-[collapsible=icon]:hidden"
+	<Sidebar.Header class="px-3 py-3.5 group-data-[collapsible=icon]:px-1.5">
+		<motion.div
+			class="flex items-center gap-2.5"
 			initial={{ opacity: 0, x: -6 }}
 			animate={{ opacity: 1, x: 0 }}
-			transition={smooth}
+			transition={{ ...smooth, delay: 0.02 }}
 		>
-			Hourmark
-		</motion.span>
-		<span
-			class="font-mono text-[0.6rem] tracking-[0.18em] text-muted-foreground uppercase group-data-[collapsible=icon]:hidden"
-		>
-			Time ledger
-		</span>
+			<span
+				class="grid size-7 shrink-0 place-items-center rounded-md bg-primary/15 text-primary ring-1 ring-primary/25"
+			>
+				<StampIcon class="size-3.5" />
+			</span>
+			<div class="grid min-w-0 gap-0.5 group-data-[collapsible=icon]:hidden">
+				<span
+					class="font-display truncate text-lg leading-none font-bold tracking-[-0.03em]"
+				>
+					Hourmark
+				</span>
+				<span
+					class="font-mono text-[0.55rem] tracking-[0.18em] text-muted-foreground uppercase"
+				>
+					Time ledger
+				</span>
+			</div>
+		</motion.div>
 	</Sidebar.Header>
 
 	<Sidebar.Separator class="mx-0" />
@@ -89,23 +105,42 @@
 
 			<Sidebar.GroupContent class="mt-1">
 				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton isActive={showAll} tooltipContent="All activity">
-							{#snippet child({ props })}
-								<a href="?project=all" data-sveltekit-noscroll {...props}>
-									<LayersIcon class="text-muted-foreground" />
-									<span class="flex-1 truncate">All activity</span>
-									<span class="font-mono text-xs text-muted-foreground tabular-nums">
-										{formatHours(overall.total)}h
-									</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
+					<motion.div
+						initial={{ opacity: 0, x: -4 }}
+						animate={{ opacity: 1, x: 0 }}
+						transition={{ ...smooth, delay: 0.04 }}
+					>
+						<Sidebar.MenuItem>
+							<Sidebar.MenuButton isActive={showAll} tooltipContent="All activity">
+								{#snippet child({ props })}
+									<a href="?project=all" data-sveltekit-noscroll {...props}>
+										<LayersIcon class="text-muted-foreground" />
+										<span class="flex-1 truncate">All activity</span>
+										<motion.span
+											class="font-mono text-xs text-muted-foreground tabular-nums"
+											key={overall.total}
+											initial={{ opacity: 0.5 }}
+											animate={{ opacity: 1 }}
+											transition={smooth}
+										>
+											{formatHours(overall.total)}h
+										</motion.span>
+									</a>
+								{/snippet}
+							</Sidebar.MenuButton>
+						</Sidebar.MenuItem>
+					</motion.div>
 
 					<AnimatePresence>
-						{#each projects as project (project.id)}
-							<motion.div key={project.id} {...slideIn} transition={spring} layout class="w-full">
+						{#each projects as project, i (project.id)}
+							<motion.div
+								key={project.id}
+								{...slideIn}
+								transition={{ ...spring, delay: stagger(i + 1, 0.03) }}
+								layout
+								class="w-full"
+								whileHover={{ x: 2 }}
+							>
 								<Sidebar.MenuItem>
 									<ContextMenu.Root>
 										<ContextMenu.Trigger class="w-full">
@@ -116,11 +151,16 @@
 											>
 												{#snippet child({ props })}
 													<a href="?project={project.id}" data-sveltekit-noscroll {...props}>
-														<span
+														<motion.span
 															class="size-2.5 shrink-0 rounded-full ring-2 ring-(--dot)/25"
-															style:--dot={project.color}
-															style:background={project.color}
-														></span>
+															style={`--dot: ${project.color}; background: ${project.color}`}
+															animate={
+																!showAll && project.id === selectedProjectId
+																	? { scale: [1, 1.15, 1] }
+																	: { scale: 1 }
+															}
+															transition={{ duration: 0.35, ease: 'easeOut' }}
+														></motion.span>
 														<span class="flex-1 truncate">{project.name}</span>
 														<span
 															class="font-mono text-xs tabular-nums {project.today_hours > 0
@@ -145,7 +185,7 @@
 													<PaletteIcon />
 													Change colour
 												</ContextMenu.SubTrigger>
-												<ContextMenu.SubContent class="w-44">
+												<ContextMenu.SubContent class="w-40">
 													{#each PROJECT_COLORS as swatch (swatch)}
 														<form
 															id="project-{project.id}-color-{swatch}"
@@ -177,12 +217,12 @@
 																}}
 															>
 																<span
-																	class="size-3 shrink-0 rounded-full ring-1 ring-border"
+																	class="size-3.5 shrink-0 rounded-full ring-1 ring-border"
 																	style:background={swatch}
 																></span>
-																<span class="truncate font-mono text-xs">{swatch}</span>
+																<span class="truncate text-xs">{COLOR_NAMES[swatch]}</span>
 																{#if project.color === swatch}
-																	<span class="ml-auto text-xs text-muted-foreground">Current</span>
+																	<CheckIcon class="ml-auto size-3.5 text-muted-foreground" />
 																{/if}
 															</ContextMenu.Item>
 														</form>
@@ -210,57 +250,97 @@
 				{#if projects.length === 0}
 					<motion.div
 						class="px-2 py-3 group-data-[collapsible=icon]:hidden"
-						{...fadeUp}
-						transition={smooth}
+						{...fadeUpSubtle}
+						transition={{ ...smooth, delay: 0.1 }}
 					>
 						<p class="mb-2 text-xs text-muted-foreground">No projects yet.</p>
-						<Button size="sm" class="w-full" onclick={() => (createOpen = true)}>
-							<PlusIcon />
-							New project
-						</Button>
+						<motion.div whileHover={hoverSubtle} whileTap={tapSubtle}>
+							<Button size="sm" class="w-full" onclick={() => (createOpen = true)}>
+								<PlusIcon />
+								New project
+							</Button>
+						</motion.div>
 					</motion.div>
 				{/if}
 			</Sidebar.GroupContent>
 		</Sidebar.Group>
 	</Sidebar.Content>
 
-	<Sidebar.Footer class="group-data-[collapsible=icon]:hidden">
+	<Sidebar.Footer class="gap-2.5 group-data-[collapsible=icon]:hidden">
 		<motion.div
-			class="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border"
-			initial={{ opacity: 0, y: 8 }}
+			class="grid grid-cols-2 overflow-hidden rounded-lg border border-border/80 bg-card/40"
+			initial={{ opacity: 0, y: 6 }}
 			animate={{ opacity: 1, y: 0 }}
-			transition={{ ...smooth, delay: 0.08 }}
+			transition={{ ...smooth, delay: 0.1 }}
 		>
-			<div class="grid gap-0.5 bg-sidebar px-2.5 py-2">
-				<span class="font-mono text-[0.6rem] tracking-[0.12em] text-muted-foreground uppercase">
+			<div class="grid gap-0.5 border-r border-border/60 px-2.5 py-2">
+				<span class="font-mono text-[0.55rem] tracking-[0.14em] text-muted-foreground uppercase">
 					Today
 				</span>
-				<span class="font-mono text-sm font-semibold text-primary tabular-nums">
+				<motion.span
+					class="font-mono text-sm font-semibold text-primary tabular-nums"
+					key={overall.today}
+					initial={{ opacity: 0.6, y: 2 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={smooth}
+				>
 					{formatHours(overall.today)}h
-				</span>
+				</motion.span>
 			</div>
-			<div class="grid gap-0.5 bg-sidebar px-2.5 py-2">
-				<span class="font-mono text-[0.6rem] tracking-[0.12em] text-muted-foreground uppercase">
+			<div class="grid gap-0.5 px-2.5 py-2">
+				<span class="font-mono text-[0.55rem] tracking-[0.14em] text-muted-foreground uppercase">
 					Week
 				</span>
-				<span class="font-mono text-sm font-semibold tabular-nums">
+				<motion.span
+					class="font-mono text-sm font-semibold tabular-nums"
+					key={overall.week}
+					initial={{ opacity: 0.6, y: 2 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={smooth}
+				>
 					{formatHours(overall.week)}h
-				</span>
+				</motion.span>
 			</div>
 		</motion.div>
+
+		<motion.div
+			initial={{ opacity: 0, y: 4 }}
+			animate={{ opacity: 1, y: 0 }}
+			transition={{ ...smooth, delay: 0.14 }}
+			whileHover={hoverSubtle}
+			whileTap={tapSubtle}
+		>
+			<Button
+				variant="ghost"
+				size="sm"
+				class="w-full justify-start gap-2 px-2 text-muted-foreground hover:text-foreground"
+				onclick={() => (exportOpen = true)}
+			>
+				<DownloadIcon />
+				Export notes
+			</Button>
+		</motion.div>
+
+		<form method="POST" action="?/switchProfile" class="w-full">
+			<Button type="submit" variant="ghost" size="sm" class="w-full text-muted-foreground">
+				Switch user
+			</Button>
+		</form>
 	</Sidebar.Footer>
 
 	<Sidebar.Rail />
 </Sidebar.Root>
 
 <CreateProjectDialog bind:open={createOpen} {errorMessage} />
-<EditProjectDialog
-	bind:open={editOpen}
-	project={editingProject}
-	errorMessage={editErrorMessage}
-/>
+<EditProjectDialog bind:open={editOpen} project={editingProject} errorMessage={editErrorMessage} />
 <ArchiveProjectDialog
 	bind:open={archiveOpen}
 	project={archivingProject}
 	{selectedProjectId}
+/>
+<ExportDialog
+	bind:open={exportOpen}
+	{projects}
+	{selectedProjectId}
+	{showAll}
 />
