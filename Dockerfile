@@ -8,7 +8,8 @@ ENV NPM_CONFIG_FETCH_RETRIES=5 \
 	NPM_CONFIG_FUND=false
 
 COPY package.json package-lock.json ./
-RUN npm ci || npm install
+RUN --mount=type=cache,target=/root/.npm \
+	npm ci --no-audit --no-fund
 
 FROM deps AS build
 COPY . .
