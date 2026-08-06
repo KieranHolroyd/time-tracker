@@ -39,15 +39,34 @@ docker compose up -d --build
 
 | Setting | Value |
 | --- | --- |
-| Repository | `hourmark:latest` (build locally or from your registry) |
-| Port | Host `3000` → Container `3000` |
+| Repository | `ghcr.io/<your-user>/time-tracker:latest` or a locally built `hourmark:latest` |
+| **Container port** | **`3000`** (not 5173 — that is dev only) |
+| **Host port** | e.g. `3000` → map **Host `3000` : Container `3000`** |
 | Path | Host `/mnt/user/appdata/hourmark` → Container `/data` |
-| `ORIGIN` | `http://YOUR_UNRAID_IP:3000` (or your reverse-proxy URL) |
-| `TURSO_DATABASE_URL` | `file:/data/hourmark.db` (default) |
+| `HOST` | `0.0.0.0` (default) |
+| `PORT` | `3000` (default) |
+| `ORIGIN` | `http://YOUR_UNRAID_IP:3000` (must match the browser URL, including port) |
+| `TURSO_DATABASE_URL` | `file:/data/hourmark.db` (default) or your remote Turso URL |
 | `TURSO_AUTH_TOKEN` | only if using remote Turso |
+| **Command** | leave empty (default: `node build`) — do **not** use `npm run dev` |
 | Restart | Unless-stopped |
 
-`ORIGIN` must match the URL in the browser or form submissions fail CSRF checks.
+Open **`http://YOUR_UNRAID_IP:3000`** in the browser.
+
+### Unraid troubleshooting
+
+**No logs in the UI** — Unraid often hides output until the container stays running. From the Unraid terminal:
+
+```bash
+docker logs hourmark
+docker logs -f hourmark
+```
+
+If the container restarts in a loop, logs usually show the error (missing build, wrong command, etc.).
+
+**Port not reachable** — confirm the template maps container port **3000**, not 5173. The production image does not run Vite.
+
+**Forms fail / CSRF errors** — `ORIGIN` must exactly match what you type in the browser (scheme, IP/hostname, and port).
 
 ## Connect Turso
 
