@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { goto, invalidateAll } from '$app/navigation';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import { formatHours } from '$lib/format';
+	import { formatDuration } from '$lib/format';
 	import type { ProjectWithStats } from '$lib/types';
 
 	type Props = {
@@ -25,7 +25,7 @@
 			<AlertDialog.Description>
 				{#if project}
 					<strong>{project.name}</strong> will be hidden from the sidebar. Its
-					{formatHours(project.total_hours)}h of logged time stays in your history.
+					{formatDuration(project.total_hours)} of logged time stays in your history.
 				{/if}
 			</AlertDialog.Description>
 		</AlertDialog.Header>

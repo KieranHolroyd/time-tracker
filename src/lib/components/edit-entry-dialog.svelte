@@ -1,31 +1,42 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import DurationField from '$lib/components/duration-field.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import { formatDateLong } from '$lib/format';
+	import { formatDateLong, hoursToParts } from '$lib/format';
 	import type { TimeEntry } from '$lib/types';
 
 	type Props = {
 		open?: boolean;
 		entry?: TimeEntry | null;
 		actionSuffix?: string;
+		errorMessage?: string;
 	};
 
-	let { open = $bindable(false), entry = null, actionSuffix = '' }: Props = $props();
+	let { open = $bindable(false), entry = null, actionSuffix = '', errorMessage }: Props = $props();
 	let submitting = $state(false);
+	let hours = $state(1);
+	let minutes = $state(0);
+
+	$effect(() => {
+		if (open && entry) {
+			const parts = hoursToParts(entry.hours);
+			hours = parts.hours;
+			minutes = parts.minutes;
+		}
+	});
 </script>
 
 <Dialog.Root bind:open>
 	<Dialog.Content class="sm:max-w-md">
 		<Dialog.Header>
-			<Dialog.Title>{entry?.comment ? 'Edit note' : 'Add note'}</Dialog.Title>
+			<Dialog.Title>Edit entry</Dialog.Title>
 			<Dialog.Description>
 				{#if entry}
-					{entry.hours}h on {formatDateLong(entry.worked_on)}
+					Logged on {formatDateLong(entry.worked_on)}
 					{#if entry.project_name}
 						· {entry.project_name}
 					{/if}
@@ -36,21 +47,30 @@
 		{#if entry}
 			<form
 				method="POST"
-				action="?/updateComment{actionSuffix}"
+				action="?/updateEntry{actionSuffix}"
 				class="grid gap-3"
 				use:enhance={() => {
 					submitting = true;
 					return async ({ result, update }) => {
 						submitting = false;
-						await update();
 						if (result.type === 'success') {
 							open = false;
 							await invalidateAll();
+							return;
 						}
+						await update();
 					};
 				}}
 			>
 				<input type="hidden" name="id" value={entry.id} />
+
+				<DurationField
+					bind:hours
+					bind:minutes
+					hoursId="edit-entry-hours"
+					minutesId="edit-entry-minutes"
+				/>
+
 				<div class="grid gap-1.5">
 					<Label for="entry-comment">Note</Label>
 					<Textarea
@@ -62,10 +82,14 @@
 					/>
 				</div>
 
+				{#if errorMessage}
+					<p class="m-0 text-sm text-destructive">{errorMessage}</p>
+				{/if}
+
 				<Dialog.Footer class="gap-2 sm:gap-0">
 					<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
 					<Button type="submit" disabled={submitting}>
-						{submitting ? 'Saving…' : 'Save note'}
+						{submitting ? 'Saving…' : 'Save changes'}
 					</Button>
 				</Dialog.Footer>
 			</form>

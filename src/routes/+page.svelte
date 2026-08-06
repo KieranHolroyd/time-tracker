@@ -13,11 +13,13 @@
 	import MotionReveal from '$lib/components/motion-reveal.svelte';
 	import ProfileSelector from '$lib/components/profile-selector.svelte';
 	import ProjectSidebar from '$lib/components/project-sidebar.svelte';
+	import WorkTimerPanel from '$lib/components/work-timer.svelte';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { formatDate, formatHours } from '$lib/format';
+	import { formatDate, formatDuration } from '$lib/format';
+	import { WorkTimer } from '$lib/hooks/work-timer.svelte';
 	import { cardEnter, fadeIn, slideInRight, smooth, spring, stagger } from '$lib/motion';
 
 	let { data, form } = $props();
@@ -71,6 +73,10 @@
 		form?.action === 'createProfile' ? (form.message as string | undefined) : undefined
 	);
 
+	const editProfileError = $derived(
+		form?.action === 'updateProfile' ? (form.message as string | undefined) : undefined
+	);
+
 	const editProjectError = $derived(
 		form?.action === 'updateProject' ? (form.message as string | undefined) : undefined
 	);
@@ -78,10 +84,47 @@
 	const addHourError = $derived(
 		form?.action === 'addHour' ? (form.message as string | undefined) : undefined
 	);
+
+	const editEntryError = $derived(
+		form?.action === 'updateEntry' ? (form.message as string | undefined) : undefined
+	);
+
+	const workTimer = new WorkTimer({
+		getProfileId: () => data.activeProfileId ?? 0,
+		getToday: () => data.today,
+		getActionSuffix: () => actionSuffix,
+		onLogged: async () => {
+			justLogged = true;
+			setTimeout(() => (justLogged = false), 1200);
+			await invalidateAll();
+		}
+	});
+
+	$effect(() => {
+		if (data.activeProfileId) {
+			return workTimer.init(data.activeProfileId);
+		}
+	});
+
+	const timerCanStart = $derived(Boolean(data.selectedProjectId && !data.showAll));
+	const timerProjectId = $derived(
+		workTimer.running && workTimer.snapshot
+			? workTimer.snapshot.projectId
+			: data.selectedProjectId
+	);
+	const timerProjectName = $derived(
+		workTimer.running && workTimer.snapshot
+			? workTimer.snapshot.projectName
+			: (selectedProject?.name ?? null)
+	);
 </script>
 
 {#if data.needsProfile}
-	<ProfileSelector profiles={data.profiles} errorMessage={createProfileError} />
+	<ProfileSelector
+		profiles={data.profiles}
+		createErrorMessage={createProfileError}
+		editErrorMessage={editProfileError}
+	/>
 {:else if data.activeProfileId}
 	<Sidebar.Provider style="--sidebar-width: 15rem;" class="h-svh overflow-hidden">
 		<ProjectSidebar
@@ -175,7 +218,7 @@
 										animate={{ opacity: 1, y: 0 }}
 										transition={smooth}
 									>
-										{formatHours(stat.value)}h
+										{formatDuration(stat.value)}
 									</motion.span>
 								</motion.div>
 							{/each}
@@ -249,7 +292,7 @@
 
 										<HourStamp
 											pulse={justLogged}
-											disabled={!data.selectedProjectId || logging}
+											disabled={!data.selectedProjectId || logging || workTimer.running}
 										/>
 
 										<div class="grid w-full min-w-0 flex-1 gap-3">
@@ -301,7 +344,7 @@
 																	? 'bg-primary/12 text-primary'
 																	: 'bg-muted/60 text-muted-foreground'}"
 															>
-																{formatHours(selectedProject.today_hours)}h today
+																{formatDuration(selectedProject.today_hours)} today
 															</span>
 														</div>
 													</motion.div>
@@ -318,13 +361,20 @@
 													type="button"
 													variant="outline"
 													size="sm"
-													disabled={!data.selectedProjectId}
+													disabled={!data.selectedProjectId || workTimer.running}
 													onclick={() => (logOptionsOpen = true)}
 												>
 													<Settings2Icon />
 													Custom entry
 												</Button>
 											</motion.div>
+
+											<WorkTimerPanel
+												timer={workTimer}
+												projectId={timerProjectId}
+												projectName={timerProjectName}
+												canStart={timerCanStart}
+											/>
 
 											<AnimatePresence initial={false}>
 												{#if addHourError}
@@ -365,6 +415,7 @@
 										today={data.today}
 										showProject={data.showAll}
 										{actionSuffix}
+										editErrorMessage={editEntryError}
 									/>
 								{/if}
 							{/if}

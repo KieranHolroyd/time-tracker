@@ -1,12 +1,11 @@
 <script lang="ts">
 	import { AnimatePresence, motion } from '@humanspeak/svelte-motion';
-	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import DeleteEntryDialog from '$lib/components/delete-entry-dialog.svelte';
 	import EditEntryDialog from '$lib/components/edit-entry-dialog.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { dayLabel, formatHours } from '$lib/format';
+	import { dayLabel, formatDuration } from '$lib/format';
 	import { fadeUpSubtle, listItem, smooth, spring, stagger, tapSubtle } from '$lib/motion';
 	import type { TimeEntry } from '$lib/types';
 
@@ -15,9 +14,10 @@
 		today: string;
 		showProject?: boolean;
 		actionSuffix?: string;
+		editErrorMessage?: string;
 	};
 
-	let { entries, today, showProject = false, actionSuffix = '' }: Props = $props();
+	let { entries, today, showProject = false, actionSuffix = '', editErrorMessage }: Props = $props();
 
 	let editOpen = $state(false);
 	let deleteOpen = $state(false);
@@ -52,6 +52,12 @@
 		activeEntry = entry;
 		deleteOpen = true;
 	}
+
+	$effect(() => {
+		if (editErrorMessage && activeEntry) {
+			editOpen = true;
+		}
+	});
 </script>
 
 <div class="grid gap-4">
@@ -86,7 +92,7 @@
 						animate={{ opacity: 1, y: 0 }}
 						transition={smooth}
 					>
-						{formatHours(group.total)}h
+						{formatDuration(group.total)}
 					</motion.span>
 				</motion.div>
 
@@ -116,7 +122,7 @@
 									animate={{ opacity: 1, scale: 1 }}
 									transition={{ ...spring, delay: stagger(entryIndex, 0.02) }}
 								>
-									{formatHours(entry.hours)}h
+									{formatDuration(entry.hours)}
 								</motion.span>
 
 								<div class="grid min-w-0 flex-1 gap-0.5">
@@ -148,15 +154,11 @@
 											type="button"
 											variant="ghost"
 											size="icon-xs"
-											title={entry.comment ? 'Edit note' : 'Add note'}
+											title="Edit entry"
 											onclick={() => openEdit(entry)}
 										>
-											{#if entry.comment}
-												<PencilIcon />
-											{:else}
-												<MessageSquarePlusIcon />
-											{/if}
-											<span class="sr-only">{entry.comment ? 'Edit note' : 'Add note'}</span>
+											<PencilIcon />
+											<span class="sr-only">Edit entry</span>
 										</Button>
 									</motion.div>
 
@@ -183,5 +185,10 @@
 	</AnimatePresence>
 </div>
 
-<EditEntryDialog bind:open={editOpen} entry={activeEntry} {actionSuffix} />
+<EditEntryDialog
+	bind:open={editOpen}
+	entry={activeEntry}
+	{actionSuffix}
+	errorMessage={editErrorMessage}
+/>
 <DeleteEntryDialog bind:open={deleteOpen} entry={activeEntry} {actionSuffix} />

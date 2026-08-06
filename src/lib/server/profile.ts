@@ -11,6 +11,13 @@ function mapProfileRow(row: Record<string, unknown>): Profile {
 	};
 }
 
+function rethrowProfileError(error: unknown): never {
+	if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
+		throw new Error('A profile with that name already exists');
+	}
+	throw error;
+}
+
 export async function listProfiles(): Promise<Profile[]> {
 	const db = await ensureSchema();
 	const result = await db.execute({
@@ -39,7 +46,47 @@ export async function createProfile(name: string, color?: string): Promise<Profi
 	const result = await db.execute({
 		sql: 'INSERT INTO profiles (name, color) VALUES (?, ?) RETURNING id, name, color, created_at',
 		args: [trimmed, picked]
-	});
+	}).catch(rethrowProfileError);
+
+	return mapProfileRow(result.rows[0]);
+}
+
+export async function updateProfile(
+	id: number,
+	input: { name?: string; color?: string }
+): Promise<Profile> {
+	const db = await ensureSchema();
+	const updates: string[] = [];
+	const args: (string | number)[] = [];
+
+	if (input.name !== undefined) {
+		const trimmed = input.name.trim();
+		if (!trimmed) throw new Error('Profile name is required');
+		updates.push('name = ?');
+		args.push(trimmed);
+	}
+
+	if (input.color !== undefined) {
+		const picked = input.color.trim();
+		if (!picked) throw new Error('Profile color is required');
+		updates.push('color = ?');
+		args.push(picked);
+	}
+
+	if (updates.length === 0) throw new Error('Nothing to update');
+
+	args.push(id);
+
+	const result = await db.execute({
+		sql: `UPDATE profiles SET ${updates.join(', ')}
+			WHERE id = ?
+			RETURNING id, name, color, created_at`,
+		args
+	}).catch(rethrowProfileError);
+
+	if (result.rows.length === 0) {
+		throw new Error('Profile not found');
+	}
 
 	return mapProfileRow(result.rows[0]);
 }

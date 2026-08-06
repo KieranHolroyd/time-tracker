@@ -18,7 +18,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { formatHours } from '$lib/format';
+	import { formatDuration } from '$lib/format';
 	import { fadeUpSubtle, hoverSubtle, slideIn, smooth, spring, stagger, tapSubtle } from '$lib/motion';
 	import type { ProjectWithStats, Summary } from '$lib/types';
 
@@ -123,7 +123,7 @@
 											animate={{ opacity: 1 }}
 											transition={smooth}
 										>
-											{formatHours(overall.total)}h
+											{formatDuration(overall.total)}
 										</motion.span>
 									</a>
 								{/snippet}
@@ -167,7 +167,7 @@
 																? 'text-primary'
 																: 'text-muted-foreground'}"
 														>
-															{formatHours(project.total_hours)}h
+															{formatDuration(project.total_hours)}
 														</span>
 													</a>
 												{/snippet}
@@ -284,7 +284,7 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={smooth}
 				>
-					{formatHours(overall.today)}h
+					{formatDuration(overall.today)}
 				</motion.span>
 			</div>
 			<div class="grid gap-0.5 px-2.5 py-2">
@@ -298,7 +298,7 @@
 					animate={{ opacity: 1, y: 0 }}
 					transition={smooth}
 				>
-					{formatHours(overall.week)}h
+					{formatDuration(overall.week)}
 				</motion.span>
 			</div>
 		</motion.div>

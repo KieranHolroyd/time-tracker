@@ -275,22 +275,53 @@ export async function addHour(
 	};
 }
 
+export async function updateEntry(
+	id: number,
+	profileId: number,
+	input: { hours?: number; comment?: string }
+): Promise<void> {
+	const db = await ensureSchema();
+	const updates: string[] = [];
+	const args: (string | number | null)[] = [];
+
+	if (input.hours !== undefined) {
+		if (!Number.isFinite(input.hours) || input.hours <= 0) {
+			throw new Error('Duration must be greater than zero');
+		}
+		updates.push('hours = ?');
+		args.push(input.hours);
+	}
+
+	if (input.comment !== undefined) {
+		updates.push('comment = ?');
+		args.push(input.comment.trim() || null);
+	}
+
+	if (updates.length === 0) {
+		throw new Error('Nothing to update');
+	}
+
+	args.push(id, profileId);
+
+	const result = await db.execute({
+		sql: `UPDATE time_entries SET ${updates.join(', ')}
+			WHERE id = ? AND project_id IN (
+				SELECT pp.project_id FROM project_profiles pp WHERE pp.profile_id = ?
+			)`,
+		args
+	});
+	if (result.rowsAffected === 0) {
+		throw new Error('Entry not found');
+	}
+}
+
+/** @deprecated Use updateEntry */
 export async function updateEntryComment(
 	id: number,
 	profileId: number,
 	comment: string
 ): Promise<void> {
-	const db = await ensureSchema();
-	const result = await db.execute({
-		sql: `UPDATE time_entries SET comment = ?
-			WHERE id = ? AND project_id IN (
-				SELECT pp.project_id FROM project_profiles pp WHERE pp.profile_id = ?
-			)`,
-		args: [comment.trim() || null, id, profileId]
-	});
-	if (result.rowsAffected === 0) {
-		throw new Error('Entry not found');
-	}
+	await updateEntry(id, profileId, { comment });
 }
 
 export async function deleteEntry(id: number, profileId: number): Promise<void> {

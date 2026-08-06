@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
-	import { formatDateLong, formatHours } from '$lib/format';
+	import { formatDateLong, formatDuration } from '$lib/format';
 	import type { TimeEntry } from '$lib/types';
 
 	type Props = {
@@ -20,7 +20,7 @@
 			<AlertDialog.Title>Delete entry?</AlertDialog.Title>
 			<AlertDialog.Description>
 				{#if entry}
-					This removes {formatHours(entry.hours)}h
+					This removes {formatDuration(entry.hours)}
 					{#if entry.project_name}
 						from {entry.project_name}
 					{/if}

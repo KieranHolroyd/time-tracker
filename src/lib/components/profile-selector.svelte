@@ -1,20 +1,25 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { AnimatePresence, motion } from '@humanspeak/svelte-motion';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import StampIcon from '@lucide/svelte/icons/stamp';
 	import CreateProfileDialog from '$lib/components/create-profile-dialog.svelte';
+	import EditProfileDialog from '$lib/components/edit-profile-dialog.svelte';
 	import ProfileAvatar from '$lib/components/profile-avatar.svelte';
 	import { fadeUpSubtle, scaleIn, smooth, springSoft, stagger, tapPress } from '$lib/motion';
 	import type { Profile } from '$lib/types';
 
 	type Props = {
 		profiles: Profile[];
-		errorMessage?: string;
+		createErrorMessage?: string;
+		editErrorMessage?: string;
 	};
 
-	let { profiles, errorMessage }: Props = $props();
+	let { profiles, createErrorMessage, editErrorMessage }: Props = $props();
 	let createOpen = $state(false);
+	let editOpen = $state(false);
+	let editingProfile = $state<Profile | null>(null);
 	let hoveredId = $state<number | null>(null);
 	let addHovered = $state(false);
 </script>
@@ -89,6 +94,19 @@
 							</motion.span>
 						</motion.button>
 					</form>
+
+					<button
+						type="button"
+						class="profile-card__edit"
+						class:profile-card__edit--visible={hoveredId === profile.id}
+						aria-label={`Edit ${profile.name}`}
+						onclick={() => {
+							editingProfile = profile;
+							editOpen = true;
+						}}
+					>
+						<PencilIcon class="size-3.5" />
+					</button>
 				</motion.div>
 			{/each}
 
@@ -130,7 +148,7 @@
 		</div>
 
 		<AnimatePresence initial={false}>
-			{#if errorMessage}
+			{#if createErrorMessage && !createOpen && !editOpen}
 				<motion.p
 					class="profile-screen__error"
 					initial={{ opacity: 0, y: -4 }}
@@ -138,11 +156,12 @@
 					exit={{ opacity: 0, y: -4 }}
 					transition={smooth}
 				>
-					{errorMessage}
+					{createErrorMessage}
 				</motion.p>
 			{/if}
 		</AnimatePresence>
 	</motion.div>
 </div>
 
-<CreateProfileDialog bind:open={createOpen} {errorMessage} />
+<CreateProfileDialog bind:open={createOpen} errorMessage={createErrorMessage} />
+<EditProfileDialog bind:open={editOpen} profile={editingProfile} errorMessage={editErrorMessage} />

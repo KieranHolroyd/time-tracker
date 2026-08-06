@@ -1,7 +1,8 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { PROFILE_COOKIE } from '$lib/constants';
-import { createProfile, getProfile, resolveActiveProfileId } from '$lib/server/profile';
+import { createProfile, getProfile, resolveActiveProfileId, updateProfile } from '$lib/server/profile';
+import { parseDurationInput, parseLoggedDuration } from '$lib/format';
 import {
 	addHour,
 	archiveProject,
@@ -11,7 +12,7 @@ import {
 	listProjectsWithStats,
 	summarize,
 	todayLocal,
-	updateEntryComment,
+	updateEntry,
 	updateProject
 } from '$lib/server/time';
 
@@ -112,6 +113,25 @@ export const actions: Actions = {
 		}
 	},
 
+	updateProfile: async ({ request }) => {
+		const form = await request.formData();
+		const id = Number(form.get('id'));
+		const name = String(form.get('name') ?? '');
+		const color = String(form.get('color') ?? '');
+
+		if (!id) {
+			return fail(400, { action: 'updateProfile', message: 'Missing profile' });
+		}
+
+		try {
+			await updateProfile(id, { name, color });
+			return { ok: true, action: 'updateProfile', profileId: id };
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Could not update profile';
+			return fail(400, { action: 'updateProfile', message, profileId: id });
+		}
+	},
+
 	switchProfile: async ({ cookies }) => {
 		cookies.delete(PROFILE_COOKIE, { path: '/' });
 		throw redirect(303, '/');
@@ -145,7 +165,6 @@ export const actions: Actions = {
 
 		const form = await request.formData();
 		const projectId = Number(form.get('projectId'));
-		const hoursRaw = String(form.get('hours') ?? '').trim();
 		const workedOn = String(form.get('workedOn') ?? '').trim();
 		const comment = String(form.get('comment') ?? '');
 
@@ -153,9 +172,12 @@ export const actions: Actions = {
 			return fail(400, { action: 'addHour', message: 'Choose a project first' });
 		}
 
-		const hours = hoursRaw ? Number(hoursRaw) : 1;
-		if (!Number.isFinite(hours) || hours <= 0) {
-			return fail(400, { action: 'addHour', message: 'Hours must be a positive number' });
+		let hours: number;
+		try {
+			hours = parseLoggedDuration(form);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Invalid duration';
+			return fail(400, { action: 'addHour', message });
 		}
 
 		try {
@@ -167,10 +189,10 @@ export const actions: Actions = {
 		}
 	},
 
-	updateComment: async ({ request, cookies }) => {
+	updateEntry: async ({ request, cookies }) => {
 		const activeProfileId = await resolveActiveProfileId(cookies);
 		if (!activeProfileId) {
-			return fail(400, { action: 'updateComment', message: 'Choose a profile first' });
+			return fail(400, { action: 'updateEntry', message: 'Choose a profile first' });
 		}
 
 		const form = await request.formData();
@@ -178,15 +200,23 @@ export const actions: Actions = {
 		const comment = String(form.get('comment') ?? '');
 
 		if (!id) {
-			return fail(400, { action: 'updateComment', message: 'Missing entry' });
+			return fail(400, { action: 'updateEntry', message: 'Missing entry' });
+		}
+
+		let hours: number;
+		try {
+			hours = parseDurationInput(form.get('durationHours'), form.get('durationMinutes'));
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Invalid duration';
+			return fail(400, { action: 'updateEntry', message, entryId: id });
 		}
 
 		try {
-			await updateEntryComment(id, activeProfileId, comment);
-			return { ok: true, action: 'updateComment' };
+			await updateEntry(id, activeProfileId, { hours, comment });
+			return { ok: true, action: 'updateEntry' };
 		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Could not update comment';
-			return fail(400, { action: 'updateComment', message });
+			const message = error instanceof Error ? error.message : 'Could not update entry';
+			return fail(400, { action: 'updateEntry', message, entryId: id });
 		}
 	},
 

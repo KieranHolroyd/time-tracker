@@ -1,4 +1,4 @@
-import { dayLabel, formatDateLong, formatHours } from '$lib/format';
+import { dayLabel, formatDateLong, formatDuration } from '$lib/format';
 import type { Profile, TimeEntry } from '$lib/types';
 
 type ExportOptions = {
@@ -44,8 +44,8 @@ export function formatNotesExport({ profile, entries, today, projectName }: Expo
 		for (const [date, dateEntries] of byDate) {
 			lines.push(`### ${dayLabel(date, today)} (${formatDateLong(date)})`);
 			for (const entry of dateEntries) {
-				const hours = formatHours(entry.hours);
-				lines.push(`  • ${hours}h — ${entry.comment!.trim()}`);
+				const duration = formatDuration(entry.hours);
+				lines.push(`  • ${duration} — ${entry.comment!.trim()}`);
 			}
 			lines.push('');
 		}

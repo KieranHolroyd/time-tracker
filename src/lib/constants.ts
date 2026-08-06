@@ -29,3 +29,11 @@ export const PROFILE_COLORS = [
 ] as const;
 
 export const PROFILE_COOKIE = 'hourmark_profile';
+
+/** Presence check interval while the work timer is running. */
+export const TIMER_CHECK_INTERVAL_MS = 15 * 60 * 1000;
+
+/** How long the user has to confirm a presence check. */
+export const TIMER_CHECK_TIMEOUT_MS = 30 * 1000;
+
+export const TIMER_STORAGE_KEY = 'hourmark_timer';

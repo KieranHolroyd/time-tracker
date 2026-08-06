@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
+	import DurationField from '$lib/components/duration-field.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
@@ -26,6 +27,15 @@
 	}: Props = $props();
 
 	let submitting = $state(false);
+	let hours = $state(1);
+	let minutes = $state(0);
+
+	$effect(() => {
+		if (open) {
+			hours = 1;
+			minutes = 0;
+		}
+	});
 </script>
 
 <Dialog.Root bind:open>
@@ -34,7 +44,7 @@
 			<Dialog.Title>Log time</Dialog.Title>
 			<Dialog.Description>
 				{#if projectName}
-					Add hours to {projectName} with optional details.
+					Add time to {projectName} with optional details.
 				{:else}
 					Choose a project in the sidebar first.
 				{/if}
@@ -59,24 +69,12 @@
 		>
 			<input type="hidden" name="projectId" value={projectId ?? ''} />
 
-			<div class="grid grid-cols-2 gap-3">
-				<div class="grid gap-1.5">
-					<Label for="log-date">Date</Label>
-					<Input id="log-date" type="date" name="workedOn" value={today} class="h-9" />
-				</div>
-				<div class="grid gap-1.5">
-					<Label for="log-hours">Hours</Label>
-					<Input
-						id="log-hours"
-						type="number"
-						name="hours"
-						min="0.25"
-						step="0.25"
-						value="1"
-						class="h-9"
-					/>
-				</div>
+			<div class="grid gap-1.5">
+				<Label for="log-date">Date</Label>
+				<Input id="log-date" type="date" name="workedOn" value={today} class="h-9" />
 			</div>
+
+			<DurationField bind:hours bind:minutes hoursId="log-hours" minutesId="log-minutes" />
 
 			<div class="grid gap-1.5">
 				<Label for="log-comment">Comment</Label>
