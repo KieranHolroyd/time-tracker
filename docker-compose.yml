@@ -1,0 +1,21 @@
+services:
+  hourmark:
+    build: .
+    image: hourmark:latest
+    container_name: hourmark
+    ports:
+      - "3000:3000"
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "3000"
+      # Must match the browser URL (Unraid IP/hostname + port, or reverse-proxy URL).
+      ORIGIN: "${ORIGIN:-http://localhost:3000}"
+      # Default: SQLite on the /data volume. Or point at Turso instead.
+      TURSO_DATABASE_URL: "${TURSO_DATABASE_URL:-file:/data/hourmark.db}"
+      TURSO_AUTH_TOKEN: "${TURSO_AUTH_TOKEN:-}"
+    volumes:
+      - hourmark-data:/data
+    restart: unless-stopped
+
+volumes:
+  hourmark-data:
