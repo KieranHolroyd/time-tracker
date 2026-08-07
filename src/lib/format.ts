@@ -121,3 +121,30 @@ export function dayLabel(iso: string, today: string = todayLocal()): string {
 
 	return formatDate(iso);
 }
+
+const moneyFormatters = new Map<string, Intl.NumberFormat>();
+
+/** Format a currency amount for display. */
+export function formatMoney(amount: number, currency: string): string {
+	const code = currency.trim().toUpperCase() || 'GBP';
+	let formatter = moneyFormatters.get(code);
+
+	if (!formatter) {
+		try {
+			formatter = new Intl.NumberFormat(undefined, {
+				style: 'currency',
+				currency: code,
+				maximumFractionDigits: 2
+			});
+		} catch {
+			formatter = new Intl.NumberFormat(undefined, {
+				style: 'currency',
+				currency: 'GBP',
+				maximumFractionDigits: 2
+			});
+		}
+		moneyFormatters.set(code, formatter);
+	}
+
+	return formatter.format(amount);
+}

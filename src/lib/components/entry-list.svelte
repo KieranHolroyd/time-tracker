@@ -4,7 +4,9 @@
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import DeleteEntryDialog from '$lib/components/delete-entry-dialog.svelte';
 	import EditEntryDialog from '$lib/components/edit-entry-dialog.svelte';
+	import EarningsHint from '$lib/components/earnings-hint.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
+	import { billableAmount } from '$lib/earnings';
 	import { dayLabel, formatDuration } from '$lib/format';
 	import { fadeUpSubtle, listItem, smooth, spring, stagger, tapSubtle } from '$lib/motion';
 	import type { TimeEntry } from '$lib/types';
@@ -15,9 +17,19 @@
 		showProject?: boolean;
 		actionSuffix?: string;
 		editErrorMessage?: string;
+		hourlyRate?: number | null;
+		currency?: string;
 	};
 
-	let { entries, today, showProject = false, actionSuffix = '', editErrorMessage }: Props = $props();
+	let {
+		entries,
+		today,
+		showProject = false,
+		actionSuffix = '',
+		editErrorMessage,
+		hourlyRate = null,
+		currency = 'GBP'
+	}: Props = $props();
 
 	let editOpen = $state(false);
 	let deleteOpen = $state(false);
@@ -93,6 +105,15 @@
 						transition={smooth}
 					>
 						{formatDuration(group.total)}
+						{#if billableAmount(group.total, hourlyRate) != null}
+							<span class="text-muted-foreground/70">
+								· <EarningsHint
+									amount={billableAmount(group.total, hourlyRate)}
+									{currency}
+									class="text-[0.68rem]"
+								/>
+							</span>
+						{/if}
 					</motion.span>
 				</motion.div>
 
@@ -122,7 +143,16 @@
 									animate={{ opacity: 1, scale: 1 }}
 									transition={{ ...spring, delay: stagger(entryIndex, 0.02) }}
 								>
-									{formatDuration(entry.hours)}
+									<span class="grid gap-0.5">
+										<span>{formatDuration(entry.hours)}</span>
+										{#if billableAmount(entry.hours, hourlyRate) != null}
+											<EarningsHint
+												amount={billableAmount(entry.hours, hourlyRate)}
+												{currency}
+												class="text-[0.62rem] font-medium text-primary/75"
+											/>
+										{/if}
+									</span>
 								</motion.span>
 
 								<div class="grid min-w-0 flex-1 gap-0.5">

@@ -13,12 +13,15 @@
 	import MotionReveal from '$lib/components/motion-reveal.svelte';
 	import ProfileSelector from '$lib/components/profile-selector.svelte';
 	import ProjectSidebar from '$lib/components/project-sidebar.svelte';
+	import SettingsDialog from '$lib/components/settings-dialog.svelte';
 	import WorkTimerPanel from '$lib/components/work-timer.svelte';
+	import EarningsHint from '$lib/components/earnings-hint.svelte';
 	import { Alert, AlertDescription } from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Separator } from '$lib/components/ui/separator/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { formatDate, formatDuration } from '$lib/format';
+	import { buildEarningsSummary, hasBillableRate } from '$lib/earnings';
 	import { WorkTimer } from '$lib/hooks/work-timer.svelte';
 	import { cardEnter, fadeIn, slideInRight, smooth, spring, stagger } from '$lib/motion';
 
@@ -28,6 +31,7 @@
 	let logging = $state(false);
 	let createOpen = $state(false);
 	let logOptionsOpen = $state(false);
+	let settingsOpen = $state(false);
 
 	$effect(() => {
 		if (form?.ok && form.action === 'addHour') {
@@ -53,11 +57,19 @@
 				: ''
 	);
 
-	const stats = $derived([
-		{ label: 'Today', value: data.summary.today, accent: true },
-		{ label: 'Week', value: data.summary.week, accent: false },
-		{ label: 'Total', value: data.summary.total, accent: false }
-	]);
+	const stats = $derived.by(() => {
+		if (data.showAll || !selectedProject) return [];
+
+		const earnings = buildEarningsSummary(data.summary, data.settings, data.today);
+		return [
+			{ label: 'Today', value: data.summary.today, earnings: earnings.today, accent: true },
+			{ label: 'Week', value: data.summary.week, earnings: earnings.week, accent: false },
+			{ label: 'Total', value: data.summary.total, earnings: earnings.total, accent: false }
+		];
+	});
+
+	const showEarnings = $derived(hasBillableRate(data.settings));
+	const showStats = $derived(stats.length > 0);
 
 	const entryCountLabel = $derived(
 		data.entries.length === 0
@@ -87,6 +99,10 @@
 
 	const editEntryError = $derived(
 		form?.action === 'updateEntry' ? (form.message as string | undefined) : undefined
+	);
+
+	const settingsError = $derived(
+		form?.action === 'updateSettings' ? (form.message as string | undefined) : undefined
 	);
 
 	const workTimer = new WorkTimer({
@@ -132,7 +148,10 @@
 			selectedProjectId={data.selectedProjectId}
 			showAll={data.showAll}
 			overall={data.overall}
+			settings={data.settings}
+			today={data.today}
 			bind:createOpen
+			bind:settingsOpen
 			errorMessage={createError}
 			editErrorMessage={editProjectError}
 		/>
@@ -161,17 +180,7 @@
 						transition={smooth}
 					>
 						<AnimatePresence mode="wait" initial={false}>
-							{#if selectedProject}
-								<motion.span
-									key={selectedProject.id}
-									class="size-2.5 shrink-0 rounded-full ring-2 ring-(--dot)/25"
-									style={`--dot: ${selectedProject.color}; background: ${selectedProject.color}`}
-									initial={{ opacity: 0, scale: 0 }}
-									animate={{ opacity: 1, scale: 1 }}
-									exit={{ opacity: 0, scale: 0 }}
-									transition={spring}
-								></motion.span>
-							{:else if data.showAll}
+							{#if data.showAll}
 								<motion.span
 									key="all"
 									class="shrink-0 text-muted-foreground"
@@ -200,31 +209,38 @@
 					</motion.div>
 				</AnimatePresence>
 
-				<div class="ml-auto flex items-center">
-					<AnimatePresence mode="wait" initial={false}>
-						<motion.div key={panelKey} class="stat-strip" {...fadeIn} transition={smooth}>
-							{#each stats as stat, i (stat.label)}
-								<motion.div
-									class="stat-strip__cell {stat.label !== 'Today' ? 'hidden sm:grid' : ''}"
-									initial={{ opacity: 0, y: 4 }}
-									animate={{ opacity: 1, y: 0 }}
-									transition={{ ...spring, delay: stagger(i, 0.04) }}
-								>
-									<span class="stat-strip__label">{stat.label}</span>
-									<motion.span
-										class="stat-strip__value {stat.accent ? 'text-primary' : ''}"
-										key={stat.value}
-										initial={{ opacity: 0.6, y: 2 }}
+				{#if showStats}
+					<div class="ml-auto flex items-center">
+						<AnimatePresence mode="wait" initial={false}>
+							<motion.div key={panelKey} class="stat-strip" {...fadeIn} transition={smooth}>
+								{#each stats as stat, i (stat.label)}
+									<motion.div
+										class="stat-strip__cell {stat.label !== 'Today' ? 'hidden sm:grid' : ''}"
+										initial={{ opacity: 0, y: 4 }}
 										animate={{ opacity: 1, y: 0 }}
-										transition={smooth}
+										transition={{ ...spring, delay: stagger(i, 0.04) }}
 									>
-										{formatDuration(stat.value)}
-									</motion.span>
-								</motion.div>
-							{/each}
-						</motion.div>
-					</AnimatePresence>
-				</div>
+										<span class="stat-strip__label">{stat.label}</span>
+										<motion.span
+											class="stat-strip__value {stat.accent ? 'text-primary' : ''}"
+											key={stat.value}
+											initial={{ opacity: 0.6, y: 2 }}
+											animate={{ opacity: 1, y: 0 }}
+											transition={smooth}
+										>
+											{formatDuration(stat.value)}
+										</motion.span>
+										{#if showEarnings && stat.earnings != null}
+											<span class="stat-strip__sub">
+												<EarningsHint amount={stat.earnings} currency={data.settings.currency} />
+											</span>
+										{/if}
+									</motion.div>
+								{/each}
+							</motion.div>
+						</AnimatePresence>
+					</div>
+				{/if}
 			</motion.header>
 
 			<div class="min-h-0 flex-1 overflow-y-auto">
@@ -316,37 +332,17 @@
 												{:else if selectedProject}
 													<motion.div
 														key={selectedProject.id}
-														class="grid gap-1.5"
+														class="flex flex-wrap items-center gap-2"
 														initial={{ opacity: 0, x: 4 }}
 														animate={{ opacity: 1, x: 0 }}
 														exit={{ opacity: 0, x: -4 }}
 														transition={smooth}
 													>
 														<span
-															class="font-mono text-[0.6rem] tracking-[0.16em] text-muted-foreground uppercase"
+															class="rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[0.68rem] text-muted-foreground"
 														>
-															Logging to
+															{formatDate(data.today)}
 														</span>
-														<span
-															class="font-display truncate text-xl leading-none font-semibold tracking-[-0.02em]"
-														>
-															{selectedProject.name}
-														</span>
-														<div class="flex flex-wrap items-center gap-1.5">
-															<span
-																class="rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[0.68rem] text-muted-foreground"
-															>
-																{formatDate(data.today)}
-															</span>
-															<span
-																class="rounded-md px-1.5 py-0.5 font-mono text-[0.68rem] tabular-nums {selectedProject.today_hours >
-																0
-																	? 'bg-primary/12 text-primary'
-																	: 'bg-muted/60 text-muted-foreground'}"
-															>
-																{formatDuration(selectedProject.today_hours)} today
-															</span>
-														</div>
 													</motion.div>
 												{/if}
 											</AnimatePresence>
@@ -416,6 +412,8 @@
 										showProject={data.showAll}
 										{actionSuffix}
 										editErrorMessage={editEntryError}
+										hourlyRate={data.settings.hourly_rate}
+										currency={data.settings.currency}
 									/>
 								{/if}
 							{/if}
@@ -433,5 +431,14 @@
 		today={data.today}
 		{actionSuffix}
 		errorMessage={addHourError}
+	/>
+
+	<SettingsDialog
+		bind:open={settingsOpen}
+		settings={data.settings}
+		summary={data.summary}
+		overall={data.overall}
+		today={data.today}
+		errorMessage={settingsError}
 	/>
 {/if}

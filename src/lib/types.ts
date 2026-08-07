@@ -35,3 +35,9 @@ export type Summary = {
 	week: number;
 	total: number;
 };
+
+export type ProfileSettings = {
+	hourly_rate: number | null;
+	currency: string;
+	weekly_hours_goal: number | null;
+};

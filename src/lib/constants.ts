@@ -37,3 +37,6 @@ export const TIMER_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 export const TIMER_CHECK_TIMEOUT_MS = 30 * 1000;
 
 export const TIMER_STORAGE_KEY = 'hourmark_timer';
+
+export const SUPPORTED_CURRENCIES = ['GBP', 'USD', 'EUR', 'AUD', 'CAD'] as const;
+export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number];

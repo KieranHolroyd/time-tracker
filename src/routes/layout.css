@@ -244,6 +244,214 @@
 		line-height: 1.2;
 	}
 
+	.stat-strip__sub {
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		font-weight: 500;
+		font-variant-numeric: tabular-nums;
+		color: var(--muted-foreground);
+		line-height: 1.2;
+	}
+
+	.earnings-hint {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.settings-preview {
+		gap: 0.55rem;
+	}
+
+	.settings-preview__title {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.55rem;
+		font-weight: 500;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--muted-foreground);
+	}
+
+	.settings-preview__row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 0.75rem;
+		font-size: 0.8125rem;
+	}
+
+	.settings-preview__row--muted {
+		color: var(--muted-foreground);
+		font-size: 0.75rem;
+	}
+
+	.settings-preview__progress {
+		display: grid;
+		gap: 0.35rem;
+		padding-top: 0.15rem;
+	}
+
+	.settings-preview__progress-label {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.5rem;
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		color: var(--muted-foreground);
+	}
+
+	.settings-preview__progress-track {
+		height: 0.35rem;
+		overflow: hidden;
+		border-radius: 999px;
+		background: oklch(0.93 0.02 85 / 8%);
+	}
+
+	.settings-preview__progress-fill {
+		height: 100%;
+		border-radius: inherit;
+		background: linear-gradient(90deg, var(--brass-deep), var(--primary));
+		transition: width 0.25s ease;
+	}
+
+	.sidebar-footer {
+		padding: 0.75rem;
+	}
+
+	.sidebar-footer__panel {
+		display: grid;
+		gap: 0;
+		overflow: hidden;
+		border: 1px solid var(--hairline);
+		border-radius: calc(var(--radius) - 2px);
+		background: oklch(0.2 0.016 250 / 55%);
+	}
+
+	.sidebar-footer__stats {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.sidebar-footer__stat {
+		display: grid;
+		gap: 0.1rem;
+		padding: 0.65rem 0.75rem;
+	}
+
+	.sidebar-footer__stat + .sidebar-footer__stat {
+		border-left: 1px solid var(--hairline);
+	}
+
+	.sidebar-footer__stat-label {
+		font-family: var(--font-mono);
+		font-size: 0.52rem;
+		font-weight: 500;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--muted-foreground);
+	}
+
+	.sidebar-footer__stat-value {
+		font-family: var(--font-mono);
+		font-size: 0.875rem;
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		line-height: 1.2;
+	}
+
+	.sidebar-footer__stat-value--accent {
+		color: var(--primary);
+	}
+
+	.sidebar-footer__goal {
+		display: grid;
+		gap: 0.35rem;
+		padding: 0.55rem 0.75rem 0.65rem;
+		border-top: 1px solid var(--hairline);
+	}
+
+	.sidebar-footer__goal-header {
+		display: flex;
+		justify-content: space-between;
+		gap: 0.5rem;
+		font-family: var(--font-mono);
+		font-size: 0.52rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--muted-foreground);
+	}
+
+	.sidebar-footer__actions {
+		display: grid;
+		border-top: 1px solid var(--hairline);
+	}
+
+	.sidebar-footer__action {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		width: 100%;
+		padding: 0.55rem 0.75rem;
+		border: 0;
+		background: transparent;
+		color: var(--muted-foreground);
+		font-size: 0.8125rem;
+		text-align: left;
+		cursor: pointer;
+		transition:
+			color 0.15s ease,
+			background 0.15s ease;
+	}
+
+	.sidebar-footer__action:hover {
+		color: var(--foreground);
+		background: oklch(0.93 0.02 85 / 4%);
+	}
+
+	.sidebar-footer__action :global(svg) {
+		width: 0.9rem;
+		height: 0.9rem;
+		opacity: 0.72;
+	}
+
+	.sidebar-footer__action + .sidebar-footer__action,
+	.sidebar-footer__actions form + .sidebar-footer__action,
+	.sidebar-footer__action + form {
+		border-top: 1px solid var(--hairline);
+	}
+
+	.sidebar-footer__action--muted {
+		font-size: 0.75rem;
+		color: var(--muted-foreground);
+		opacity: 0.85;
+	}
+
+	.sidebar-project-dot {
+		width: 0.55rem;
+		height: 0.55rem;
+		flex-shrink: 0;
+		border-radius: 999px;
+		background: var(--dot);
+		box-shadow: 0 0 0 0 transparent;
+		transition: box-shadow 0.18s ease;
+	}
+
+	.sidebar-project-dot--active {
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--dot) 35%, transparent);
+	}
+
+	.sidebar-project-hours {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-variant-numeric: tabular-nums;
+		color: var(--muted-foreground);
+	}
+
+	.sidebar-project-hours--today {
+		color: var(--primary);
+		font-weight: 600;
+	}
+
 	.hour-stamp {
 		position: relative;
 		width: min(var(--stamp-size, 132px), 60vw);

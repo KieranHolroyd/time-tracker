@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { PROFILE_COOKIE } from '$lib/constants';
 import { createProfile, getProfile, resolveActiveProfileId, updateProfile } from '$lib/server/profile';
+import { getProfileSettings, updateProfileSettings } from '$lib/server/settings';
 import { parseDurationInput, parseLoggedDuration } from '$lib/format';
 import {
 	addHour,
@@ -34,6 +35,7 @@ export const load: PageServerLoad = async ({ url, parent }) => {
 			entries: [],
 			summary: { today: 0, week: 0, total: 0 },
 			overall: { today: 0, week: 0, total: 0 },
+			settings: { hourly_rate: null, currency: 'GBP', weekly_hours_goal: null },
 			selectedProjectId: null,
 			showAll: false,
 			today: todayLocal()
@@ -50,10 +52,11 @@ export const load: PageServerLoad = async ({ url, parent }) => {
 		selectedProjectId = match?.id ?? projects[0]?.id ?? null;
 	}
 
-	const [entries, summary, overall] = await Promise.all([
+	const [entries, summary, overall, settings] = await Promise.all([
 		listEntries(activeProfileId, { projectId: selectedProjectId ?? undefined }),
 		summarize(activeProfileId, selectedProjectId ?? undefined),
-		summarize(activeProfileId)
+		summarize(activeProfileId),
+		getProfileSettings(activeProfileId)
 	]);
 
 	return {
@@ -64,6 +67,7 @@ export const load: PageServerLoad = async ({ url, parent }) => {
 		entries,
 		summary,
 		overall,
+		settings,
 		selectedProjectId,
 		showAll,
 		today: todayLocal()
@@ -288,6 +292,44 @@ export const actions: Actions = {
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Could not archive project';
 			return fail(400, { action: 'archiveProject', message });
+		}
+	},
+
+	updateSettings: async ({ request, cookies }) => {
+		const activeProfileId = await resolveActiveProfileId(cookies);
+		if (!activeProfileId) {
+			return fail(400, { action: 'updateSettings', message: 'Choose a profile first' });
+		}
+
+		const form = await request.formData();
+		const hourlyRateRaw = String(form.get('hourlyRate') ?? '').trim();
+		const currency = String(form.get('currency') ?? 'GBP');
+		const weeklyGoalRaw = String(form.get('weeklyHoursGoal') ?? '').trim();
+
+		const hourly_rate = hourlyRateRaw ? Number(hourlyRateRaw) : null;
+		const weekly_hours_goal = weeklyGoalRaw ? Number(weeklyGoalRaw) : null;
+
+		if (hourlyRateRaw && (!Number.isFinite(hourly_rate!) || hourly_rate! < 0)) {
+			return fail(400, { action: 'updateSettings', message: 'Hourly rate must be zero or greater' });
+		}
+
+		if (weeklyGoalRaw && (!Number.isFinite(weekly_hours_goal!) || weekly_hours_goal! <= 0)) {
+			return fail(400, {
+				action: 'updateSettings',
+				message: 'Weekly hours goal must be greater than zero'
+			});
+		}
+
+		try {
+			await updateProfileSettings(activeProfileId, {
+				hourly_rate,
+				currency,
+				weekly_hours_goal
+			});
+			return { ok: true, action: 'updateSettings' };
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Could not save settings';
+			return fail(400, { action: 'updateSettings', message });
 		}
 	}
 };

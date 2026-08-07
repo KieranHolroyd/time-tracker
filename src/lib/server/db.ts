@@ -84,9 +84,26 @@ export async function ensureSchema(): Promise<Client> {
 
 	await migrateExistingProjects(db);
 	await migrateDropProjectNameUnique(db);
+	await migrateProfileSettings(db);
 
 	migrated = true;
 	return db;
+}
+
+async function migrateProfileSettings(db: Client) {
+	const columns = (await db.execute('PRAGMA table_info(profiles)')).rows.map((row) =>
+		String(row.name)
+	);
+
+	if (!columns.includes('hourly_rate')) {
+		await db.execute('ALTER TABLE profiles ADD COLUMN hourly_rate REAL');
+	}
+	if (!columns.includes('currency')) {
+		await db.execute("ALTER TABLE profiles ADD COLUMN currency TEXT NOT NULL DEFAULT 'GBP'");
+	}
+	if (!columns.includes('weekly_hours_goal')) {
+		await db.execute('ALTER TABLE profiles ADD COLUMN weekly_hours_goal REAL');
+	}
 }
 
 async function migrateDropProjectNameUnique(db: Client) {
