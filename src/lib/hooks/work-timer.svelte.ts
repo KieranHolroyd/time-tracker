@@ -1,3 +1,4 @@
+import { untrack } from 'svelte';
 import { browser } from '$app/environment';
 import { deserialize } from '$app/forms';
 import {
@@ -81,24 +82,31 @@ export class WorkTimer {
 		return this.#logging;
 	}
 
+	/**
+	 * Callers are expected to run this from an `$effect`. Restoring a session both
+	 * writes and reads `#snapshot`, so the setup is untracked to keep it from
+	 * registering as a dependency of that effect and re-triggering itself.
+	 */
 	init(profileId: number) {
 		if (!browser) return;
 
-		this.#permission = getNotificationSupport();
-		this.#restore(profileId);
-		this.#tickId = setInterval(() => this.#onTick(), 1000);
+		return untrack(() => {
+			this.#permission = getNotificationSupport();
+			this.#restore(profileId);
+			this.#tickId = setInterval(() => this.#onTick(), 1000);
 
-		const onVisibility = () => {
-			if (document.visibilityState === 'visible') {
-				this.#onTick(true);
-			}
-		};
-		document.addEventListener('visibilitychange', onVisibility);
+			const onVisibility = () => {
+				if (document.visibilityState === 'visible') {
+					this.#onTick(true);
+				}
+			};
+			document.addEventListener('visibilitychange', onVisibility);
 
-		return () => {
-			document.removeEventListener('visibilitychange', onVisibility);
-			this.destroy();
-		};
+			return () => {
+				document.removeEventListener('visibilitychange', onVisibility);
+				this.destroy();
+			};
+		});
 	}
 
 	destroy() {
