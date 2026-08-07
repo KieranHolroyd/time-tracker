@@ -1,8 +1,6 @@
 <script lang="ts">
-	import { motion } from '@humanspeak/svelte-motion';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
-	import { stampPulse, smooth, hoverLift, tapPress } from '$lib/motion';
 
 	type Props = HTMLButtonAttributes & {
 		pulse?: boolean;
@@ -21,24 +19,18 @@
 	}: Props = $props();
 </script>
 
-<motion.div
-	class="inline-flex"
-	initial={false}
-	animate={pulse ? { scale: [...stampPulse.scale] } : { opacity: 1, scale: 1 }}
-	transition={pulse ? stampPulse.transition : smooth}
-	whileHover={disabled ? undefined : hoverLift}
-	whileTap={disabled ? undefined : tapPress}
->
+<div class="inline-flex shrink-0">
 	<button
 		{type}
 		{disabled}
 		style={`--stamp-size: ${size}px`}
-		class={cn('hour-stamp', className)}
+		class={cn('hour-stamp', pulse && 'hour-stamp--stamped', className)}
 		aria-label="Add one hour"
 		{...restProps}
 	>
 		<span class="hour-stamp__ring" aria-hidden="true"></span>
 		<span class="hour-stamp__hours">{hoursLabel}</span>
 		<span class="hour-stamp__label">Add hour</span>
+		<span class="hour-stamp__shock" aria-hidden="true"></span>
 	</button>
-</motion.div>
+</div>

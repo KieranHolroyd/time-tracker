@@ -3,7 +3,8 @@
 
 	type Props = {
 		profile: Profile;
-		size?: 'sm' | 'md' | 'lg' | 'xl';
+		/** `tile` defers sizing to the surrounding grid's `--profile-tile`. */
+		size?: 'sm' | 'md' | 'lg' | 'xl' | 'tile';
 		class?: string;
 	};
 
@@ -21,8 +22,9 @@
 		{
 			sm: 'profile-avatar--sm size-6 text-[0.65rem]',
 			md: 'size-16 text-xl',
-			lg: 'size-24 text-3xl',
-			xl: 'size-28 text-4xl'
+			lg: 'size-20 text-2xl sm:size-24 sm:text-3xl',
+			xl: 'size-20 text-3xl sm:size-28 sm:text-4xl',
+			tile: 'profile-avatar--tile'
 		}[size]
 	);
 </script>

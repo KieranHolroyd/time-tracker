@@ -152,7 +152,9 @@
 														? `${formatDuration(project.total_hours)} total`
 														: undefined}
 												>
-													{projectHoursLabel(project)}
+													{#key projectHoursLabel(project)}
+														<span class="value-tick">{projectHoursLabel(project)}</span>
+													{/key}
 												</span>
 											</a>
 										{/snippet}
@@ -246,7 +248,9 @@
 				<div class="sidebar-footer__stat">
 					<span class="sidebar-footer__stat-label">All today</span>
 					<span class="sidebar-footer__stat-value sidebar-footer__stat-value--accent">
-						{formatDuration(overall.today)}
+						{#key overall.today}
+							<span class="value-tick">{formatDuration(overall.today)}</span>
+						{/key}
 					</span>
 					{#if showEarnings && overallEarnings.today != null}
 						<EarningsHint
@@ -258,7 +262,11 @@
 				</div>
 				<div class="sidebar-footer__stat">
 					<span class="sidebar-footer__stat-label">All week</span>
-					<span class="sidebar-footer__stat-value">{formatDuration(overall.week)}</span>
+					<span class="sidebar-footer__stat-value">
+						{#key overall.week}
+							<span class="value-tick">{formatDuration(overall.week)}</span>
+						{/key}
+					</span>
 					{#if showEarnings && overallEarnings.week != null}
 						<EarningsHint
 							amount={overallEarnings.week}

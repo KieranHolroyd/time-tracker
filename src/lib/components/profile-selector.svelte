@@ -1,13 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { AnimatePresence, motion } from '@humanspeak/svelte-motion';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import StampIcon from '@lucide/svelte/icons/stamp';
 	import CreateProfileDialog from '$lib/components/create-profile-dialog.svelte';
 	import EditProfileDialog from '$lib/components/edit-profile-dialog.svelte';
 	import ProfileAvatar from '$lib/components/profile-avatar.svelte';
-	import { fadeUpSubtle, scaleIn, smooth, springSoft, stagger, tapPress } from '$lib/motion';
 	import type { Profile } from '$lib/types';
 
 	type Props = {
@@ -20,147 +18,73 @@
 	let createOpen = $state(false);
 	let editOpen = $state(false);
 	let editingProfile = $state<Profile | null>(null);
-	let hoveredId = $state<number | null>(null);
-	let addHovered = $state(false);
+
+	function tileDelay(index: number) {
+		return `--enter-delay: ${(0.1 + index * 0.05).toFixed(2)}s`;
+	}
 </script>
 
 <div class="profile-screen">
-	<motion.div class="profile-screen__inner" {...fadeUpSubtle} transition={smooth}>
-		<motion.span
-			class="profile-screen__eyebrow"
-			initial={{ opacity: 0, y: 6 }}
-			animate={{ opacity: 1, y: 0 }}
-			transition={smooth}
-		>
-			<StampIcon class="size-3" />
+	<div class="profile-screen__inner">
+		<span class="profile-screen__eyebrow tile-enter" style="--enter-delay: 0s">
+			<StampIcon />
 			Hourmark
-		</motion.span>
+		</span>
 
-		<motion.h1
-			class="profile-screen__title"
-			initial={{ opacity: 0, y: 8 }}
-			animate={{ opacity: 1, y: 0 }}
-			transition={{ ...smooth, delay: 0.04 }}
-		>
+		<h1 class="profile-screen__title tile-enter" style="--enter-delay: 0.04s">
 			Who&apos;s tracking?
-		</motion.h1>
-		<motion.p
-			class="profile-screen__subtitle"
-			initial={{ opacity: 0, y: 6 }}
-			animate={{ opacity: 1, y: 0 }}
-			transition={{ ...smooth, delay: 0.08 }}
-		>
+		</h1>
+		<p class="profile-screen__subtitle tile-enter" style="--enter-delay: 0.08s">
 			Choose a profile to open your time ledger.
-		</motion.p>
+		</p>
 
 		<div class="profile-grid" role="list">
 			{#each profiles as profile, i (profile.id)}
-				<motion.div
-					key={profile.id}
-					class="profile-grid__item"
-					role="listitem"
-					{...scaleIn}
-					transition={{ ...springSoft, delay: stagger(i, 0.05) + 0.1 }}
-					onmouseenter={() => (hoveredId = profile.id)}
-					onmouseleave={() => (hoveredId = null)}
-				>
+				<div class="profile-grid__item tile-enter" role="listitem" style={tileDelay(i)}>
 					<form method="POST" action="?/selectProfile" use:enhance>
 						<input type="hidden" name="profileId" value={profile.id} />
-						<motion.button
+						<button
 							type="submit"
 							class="profile-card"
 							aria-label={`Open ${profile.name}'s ledger`}
-							whileTap={tapPress}
 						>
-							<motion.div
-								class="profile-card__avatar-wrap"
-								animate={{
-									scale: hoveredId === profile.id ? 1.06 : 1,
-									y: hoveredId === profile.id ? -5 : 0
-								}}
-								transition={springSoft}
-							>
-								<ProfileAvatar {profile} size="xl" />
-							</motion.div>
-							<motion.span
-								class="profile-card__name"
-								animate={{
-									opacity: hoveredId === profile.id ? 1 : 0.72,
-									y: hoveredId === profile.id ? 0 : 1
-								}}
-								transition={smooth}
-							>
-								{profile.name}
-							</motion.span>
-						</motion.button>
+							<ProfileAvatar {profile} size="tile" />
+							<span class="profile-card__name">{profile.name}</span>
+						</button>
 					</form>
 
 					<button
 						type="button"
 						class="profile-card__edit"
-						class:profile-card__edit--visible={hoveredId === profile.id}
 						aria-label={`Edit ${profile.name}`}
 						onclick={() => {
 							editingProfile = profile;
 							editOpen = true;
 						}}
 					>
-						<PencilIcon class="size-3.5" />
+						<PencilIcon />
 					</button>
-				</motion.div>
+				</div>
 			{/each}
 
-			<motion.div
-				class="profile-grid__item"
-				role="listitem"
-				{...scaleIn}
-				transition={{ ...springSoft, delay: stagger(profiles.length, 0.05) + 0.1 }}
-				onmouseenter={() => (addHovered = true)}
-				onmouseleave={() => (addHovered = false)}
-			>
-				<motion.button
+			<div class="profile-grid__item tile-enter" role="listitem" style={tileDelay(profiles.length)}>
+				<button
 					type="button"
 					class="profile-card profile-card--add"
 					onclick={() => (createOpen = true)}
-					whileTap={tapPress}
 				>
-					<motion.span
-						class="profile-card__add-icon"
-						animate={{
-							scale: addHovered ? 1.04 : 1,
-							borderColor: addHovered
-								? 'oklch(0.8 0.14 80 / 55%)'
-								: 'oklch(0.93 0.02 85 / 22%)'
-						}}
-						transition={springSoft}
-					>
+					<span class="profile-card__add-icon">
 						<PlusIcon />
-					</motion.span>
-					<motion.span
-						class="profile-card__name"
-						animate={{ opacity: addHovered ? 1 : 0.72 }}
-						transition={smooth}
-					>
-						Add profile
-					</motion.span>
-				</motion.button>
-			</motion.div>
+					</span>
+					<span class="profile-card__name">Add profile</span>
+				</button>
+			</div>
 		</div>
 
-		<AnimatePresence initial={false}>
-			{#if createErrorMessage && !createOpen && !editOpen}
-				<motion.p
-					class="profile-screen__error"
-					initial={{ opacity: 0, y: -4 }}
-					animate={{ opacity: 1, y: 0 }}
-					exit={{ opacity: 0, y: -4 }}
-					transition={smooth}
-				>
-					{createErrorMessage}
-				</motion.p>
-			{/if}
-		</AnimatePresence>
-	</motion.div>
+		{#if createErrorMessage && !createOpen && !editOpen}
+			<p class="profile-screen__error tile-enter">{createErrorMessage}</p>
+		{/if}
+	</div>
 </div>
 
 <CreateProfileDialog bind:open={createOpen} errorMessage={createErrorMessage} />

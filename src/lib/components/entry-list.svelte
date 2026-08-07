@@ -97,24 +97,22 @@
 						{dayLabel(group.date, today)}
 					</span>
 					<span class="h-px flex-1 bg-border"></span>
-					<motion.span
-						class="font-mono text-xs text-muted-foreground tabular-nums"
-						key={group.total}
-						initial={{ opacity: 0.5, y: 2 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={smooth}
-					>
-						{formatDuration(group.total)}
-						{#if billableAmount(group.total, hourlyRate) != null}
-							<span class="text-muted-foreground/70">
-								· <EarningsHint
-									amount={billableAmount(group.total, hourlyRate)}
-									{currency}
-									class="text-[0.68rem]"
-								/>
+					<span class="font-mono text-xs text-muted-foreground tabular-nums">
+						{#key group.total}
+							<span class="value-tick">
+								{formatDuration(group.total)}
+								{#if billableAmount(group.total, hourlyRate) != null}
+									<span class="text-muted-foreground/70">
+										· <EarningsHint
+											amount={billableAmount(group.total, hourlyRate)}
+											{currency}
+											class="text-[0.68rem]"
+										/>
+									</span>
+								{/if}
 							</span>
-						{/if}
-					</motion.span>
+						{/key}
+					</span>
 				</motion.div>
 
 				<ul class="panel m-0 list-none overflow-hidden p-0">
@@ -129,7 +127,7 @@
 								}}
 								layout
 								whileHover={{ backgroundColor: 'oklch(0.93 0.02 85 / 3.5%)' }}
-								class="group/entry relative flex items-center gap-3 border-b border-border/50 py-2.5 pr-2 pl-3.5 last:border-b-0"
+								class="group/entry relative flex items-center gap-2.5 border-b border-border/50 py-2.5 pr-1.5 pl-3 last:border-b-0 sm:gap-3 sm:pr-2 sm:pl-3.5"
 							>
 								<span
 									class="absolute inset-y-1.5 left-0 w-[3px] rounded-full opacity-70 transition-opacity group-hover/entry:opacity-100"
@@ -184,6 +182,7 @@
 											type="button"
 											variant="ghost"
 											size="icon-xs"
+											class="size-9 sm:size-6"
 											title="Edit entry"
 											onclick={() => openEdit(entry)}
 										>
@@ -197,8 +196,8 @@
 											type="button"
 											variant="ghost"
 											size="icon-xs"
+											class="size-9 hover:text-destructive sm:size-6"
 											title="Delete entry"
-											class="hover:text-destructive"
 											onclick={() => openDelete(entry)}
 										>
 											<Trash2Icon />

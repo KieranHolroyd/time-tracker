@@ -42,8 +42,13 @@
 							Still there? Confirm within
 							<span class="work-timer__check-countdown">{timer.checkSecondsLeft}s</span>
 						</p>
-						<motion.div whileTap={tapPress}>
-							<Button type="button" size="sm" onclick={() => timer.confirmPresence()}>
+						<motion.div class="w-full sm:w-auto" whileTap={tapPress}>
+							<Button
+								type="button"
+								size="sm"
+								class="h-9 w-full sm:h-7 sm:w-auto"
+								onclick={() => timer.confirmPresence()}
+							>
 								I'm still here
 							</Button>
 						</motion.div>
@@ -56,6 +61,7 @@
 					type="button"
 					variant="outline"
 					size="sm"
+					class="h-9 w-full sm:h-7 sm:w-auto"
 					disabled={timer.logging}
 					onclick={() => timer.stopManual()}
 				>
@@ -70,6 +76,7 @@
 				type="button"
 				variant="outline"
 				size="sm"
+				class="h-9 w-full sm:h-7 sm:w-auto"
 				disabled={!canStart || !projectId || timer.logging}
 				onclick={() => {
 					if (projectId && projectName) {

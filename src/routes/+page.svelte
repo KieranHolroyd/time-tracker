@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
-	import { AnimatePresence, motion } from '@humanspeak/svelte-motion';
+	import { motion } from '@humanspeak/svelte-motion';
 	import FolderPlusIcon from '@lucide/svelte/icons/folder-plus';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import PlusIcon from '@lucide/svelte/icons/plus';
@@ -23,7 +23,7 @@
 	import { formatDate, formatDuration } from '$lib/format';
 	import { buildEarningsSummary, hasBillableRate } from '$lib/earnings';
 	import { WorkTimer } from '$lib/hooks/work-timer.svelte';
-	import { cardEnter, fadeIn, slideInRight, smooth, spring, stagger } from '$lib/motion';
+	import { smooth, spring } from '$lib/motion';
 
 	let { data, form } = $props();
 
@@ -33,13 +33,21 @@
 	let logOptionsOpen = $state(false);
 	let settingsOpen = $state(false);
 
-	$effect(() => {
-		if (form?.ok && form.action === 'addHour') {
+	let pulseTimer: ReturnType<typeof setTimeout> | null = null;
+
+	/** The stamp recoil is a CSS animation, so the class has to detach for a frame
+	 *  before it will replay — otherwise a second log in quick succession is silent. */
+	function triggerStampPulse() {
+		if (pulseTimer) clearTimeout(pulseTimer);
+		justLogged = false;
+		requestAnimationFrame(() => {
 			justLogged = true;
-			const timer = setTimeout(() => (justLogged = false), 1200);
-			return () => clearTimeout(timer);
-		}
-	});
+			pulseTimer = setTimeout(() => {
+				justLogged = false;
+				pulseTimer = null;
+			}, 800);
+		});
+	}
 
 	const selectedProject = $derived(
 		data.projects.find((project) => project.id === data.selectedProjectId) ?? null
@@ -110,8 +118,7 @@
 		getToday: () => data.today,
 		getActionSuffix: () => actionSuffix,
 		onLogged: async () => {
-			justLogged = true;
-			setTimeout(() => (justLogged = false), 1200);
+			triggerStampPulse();
 			await invalidateAll();
 		}
 	});
@@ -172,31 +179,22 @@
 				</motion.div>
 				<Separator orientation="vertical" class="mr-1 !h-5" />
 
-				<AnimatePresence mode="wait" initial={false}>
+				{#key panelKey}
 					<motion.div
-						key={panelKey}
-						class="flex min-w-0 items-center gap-2.5"
-						{...slideInRight}
+						class="flex min-w-0 flex-1 items-center gap-2.5"
+						initial={{ opacity: 0, x: 6 }}
+						animate={{ opacity: 1, x: 0 }}
 						transition={smooth}
 					>
-						<AnimatePresence mode="wait" initial={false}>
-							{#if data.showAll}
-								<motion.span
-									key="all"
-									class="shrink-0 text-muted-foreground"
-									initial={{ opacity: 0, scale: 0.8 }}
-									animate={{ opacity: 1, scale: 1 }}
-									exit={{ opacity: 0, scale: 0.8 }}
-									transition={spring}
-								>
-									<LayersIcon class="size-4" />
-								</motion.span>
-							{/if}
-						</AnimatePresence>
+						{#if data.showAll}
+							<span class="shrink-0 text-muted-foreground">
+								<LayersIcon class="size-4" />
+							</span>
+						{/if}
 
 						<div class="grid min-w-0 gap-0.5">
 							<h1
-								class="font-display truncate text-lg leading-none font-semibold tracking-[-0.02em]"
+								class="font-display truncate text-base leading-none font-semibold tracking-[-0.02em] sm:text-lg"
 							>
 								{data.showAll ? 'All activity' : (selectedProject?.name ?? 'Hourmark')}
 							</h1>
@@ -207,218 +205,176 @@
 							</span>
 						</div>
 					</motion.div>
-				</AnimatePresence>
+				{/key}
 
 				{#if showStats}
-					<div class="ml-auto flex items-center">
-						<AnimatePresence mode="wait" initial={false}>
-							<motion.div key={panelKey} class="stat-strip" {...fadeIn} transition={smooth}>
-								{#each stats as stat, i (stat.label)}
-									<motion.div
-										class="stat-strip__cell {stat.label !== 'Today' ? 'hidden sm:grid' : ''}"
-										initial={{ opacity: 0, y: 4 }}
-										animate={{ opacity: 1, y: 0 }}
-										transition={{ ...spring, delay: stagger(i, 0.04) }}
-									>
-										<span class="stat-strip__label">{stat.label}</span>
-										<motion.span
-											class="stat-strip__value {stat.accent ? 'text-primary' : ''}"
-											key={stat.value}
-											initial={{ opacity: 0.6, y: 2 }}
-											animate={{ opacity: 1, y: 0 }}
-											transition={smooth}
-										>
-											{formatDuration(stat.value)}
-										</motion.span>
-										{#if showEarnings && stat.earnings != null}
-											<span class="stat-strip__sub">
-												<EarningsHint amount={stat.earnings} currency={data.settings.currency} />
-											</span>
-										{/if}
-									</motion.div>
-								{/each}
-							</motion.div>
-						</AnimatePresence>
+					<div class="ml-auto flex shrink-0 items-center">
+						<div class="stat-strip">
+							{#each stats as stat (stat.label)}
+								<div class="stat-strip__cell {stat.label !== 'Today' ? 'hidden sm:grid' : ''}">
+									<span class="stat-strip__label">{stat.label}</span>
+									<span class="stat-strip__value {stat.accent ? 'text-primary' : ''}">
+										{#key stat.value}
+											<span class="value-tick">{formatDuration(stat.value)}</span>
+										{/key}
+									</span>
+									{#if showEarnings && stat.earnings != null}
+										<span class="stat-strip__sub">
+											{#key stat.earnings}
+												<span class="value-tick">
+													<EarningsHint
+														amount={stat.earnings}
+														currency={data.settings.currency}
+													/>
+												</span>
+											{/key}
+										</span>
+									{/if}
+								</div>
+							{/each}
+						</div>
 					</div>
 				{/if}
 			</motion.header>
 
 			<div class="min-h-0 flex-1 overflow-y-auto">
-				<div class="mx-auto w-full max-w-3xl p-4 sm:p-6">
-					<AnimatePresence mode="wait" initial={false}>
-						<motion.div key={panelKey} class="grid gap-5" {...cardEnter} transition={smooth}>
-							{#if data.projects.length === 0}
-								<motion.div
-									class="panel grid justify-items-center gap-3 px-6 py-10 text-center"
-									initial={{ opacity: 0, y: 8, scale: 0.99 }}
-									animate={{ opacity: 1, y: 0, scale: 1 }}
-									transition={{ ...spring, delay: 0.06 }}
-								>
-									<MotionReveal index={0}>
-										<span
-											class="grid size-12 place-items-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20"
-										>
-											<FolderPlusIcon class="size-5" />
-										</span>
-									</MotionReveal>
-									<MotionReveal index={1}>
-										<h2 class="font-display m-0 text-xl tracking-[-0.02em]">
-											Create your first project
-										</h2>
-									</MotionReveal>
-									<MotionReveal index={2}>
-										<p class="m-0 max-w-xs text-sm text-muted-foreground">
-											Projects hold your hours and notes. Once you have one, logging time is a
-											single click.
-										</p>
-									</MotionReveal>
-									<MotionReveal index={3} hover>
-										<Button onclick={() => (createOpen = true)}>
-											<PlusIcon />
-											New project
-										</Button>
-									</MotionReveal>
-								</motion.div>
-							{:else}
-								<motion.div
-									class="panel panel--accent p-5"
-									style={`--panel-accent: ${selectedProject?.color ?? 'var(--brass)'}`}
-									initial={{ opacity: 0, y: 6, scale: 0.995 }}
-									animate={{ opacity: 1, y: 0, scale: 1 }}
-									transition={{ ...smooth, delay: 0.05 }}
-								>
-									<form
-										method="POST"
-										action="?/addHour{actionSuffix}"
-										class="flex flex-col items-center gap-5 sm:flex-row sm:items-center"
-										use:enhance={() => {
-											logging = true;
-											return async ({ result, update }) => {
-												logging = false;
-												await update();
-												if (result.type === 'success') {
-													justLogged = true;
-													setTimeout(() => (justLogged = false), 1200);
-													await invalidateAll();
-												}
-											};
-										}}
+				<div class="mx-auto w-full max-w-3xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6">
+					<div class="grid gap-5">
+						{#if data.projects.length === 0}
+							<div class="panel panel-enter grid justify-items-center gap-3 px-6 py-10 text-center">
+								<MotionReveal index={0}>
+									<span
+										class="grid size-12 place-items-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20"
 									>
-										<input type="hidden" name="projectId" value={data.selectedProjectId ?? ''} />
+										<FolderPlusIcon class="size-5" />
+									</span>
+								</MotionReveal>
+								<MotionReveal index={1}>
+									<h2 class="font-display m-0 text-xl tracking-[-0.02em]">
+										Create your first project
+									</h2>
+								</MotionReveal>
+								<MotionReveal index={2}>
+									<p class="m-0 max-w-xs text-sm text-muted-foreground">
+										Projects hold your hours and notes. Once you have one, logging time is a single
+										click.
+									</p>
+								</MotionReveal>
+								<MotionReveal index={3} hover>
+									<Button onclick={() => (createOpen = true)}>
+										<PlusIcon />
+										New project
+									</Button>
+								</MotionReveal>
+							</div>
+						{:else}
+							<!-- Deliberately not keyed or JS-animated: the log control must not depend
+							     on an animation completing in order to be visible. -->
+							<div
+								class="panel panel--accent panel-enter p-4 sm:p-5"
+								style={`--panel-accent: ${selectedProject?.color ?? 'var(--brass)'}; --enter-delay: 0.04s`}
+							>
+								<form
+									method="POST"
+									action="?/addHour{actionSuffix}"
+									class="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:gap-5"
+									use:enhance={() => {
+										logging = true;
+										return async ({ result, update }) => {
+											logging = false;
+											await update();
+											if (result.type === 'success') {
+												triggerStampPulse();
+												await invalidateAll();
+											}
+										};
+									}}
+								>
+									<input type="hidden" name="projectId" value={data.selectedProjectId ?? ''} />
 
-										<HourStamp
-											pulse={justLogged}
-											disabled={!data.selectedProjectId || logging || workTimer.running}
+									<HourStamp
+										pulse={justLogged}
+										disabled={!data.selectedProjectId || logging || workTimer.running}
+									/>
+
+									<div class="grid w-full min-w-0 flex-1 gap-3">
+										{#if data.showAll}
+											<div class="grid gap-1">
+												<span
+													class="font-mono text-[0.6rem] tracking-[0.16em] text-muted-foreground uppercase"
+												>
+													No project selected
+												</span>
+												<p class="m-0 text-sm text-muted-foreground">
+													Pick a project in the sidebar to log time.
+												</p>
+											</div>
+										{:else if selectedProject}
+											<div class="flex flex-wrap items-center gap-2">
+												<span
+													class="rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[0.68rem] text-muted-foreground"
+												>
+													{formatDate(data.today)}
+												</span>
+											</div>
+										{/if}
+
+										<div class="flex flex-wrap gap-2">
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												class="h-9 w-full sm:h-7 sm:w-auto"
+												disabled={!data.selectedProjectId || workTimer.running}
+												onclick={() => (logOptionsOpen = true)}
+											>
+												<Settings2Icon />
+												Custom entry
+											</Button>
+										</div>
+
+										<WorkTimerPanel
+											timer={workTimer}
+											projectId={timerProjectId}
+											projectName={timerProjectName}
+											canStart={timerCanStart}
 										/>
 
-										<div class="grid w-full min-w-0 flex-1 gap-3">
-											<AnimatePresence mode="wait" initial={false}>
-												{#if data.showAll}
-													<motion.div
-														key="all"
-														class="grid gap-1"
-														{...fadeIn}
-														transition={smooth}
-													>
-														<span
-															class="font-mono text-[0.6rem] tracking-[0.16em] text-muted-foreground uppercase"
-														>
-															No project selected
-														</span>
-														<p class="m-0 text-sm text-muted-foreground">
-															Pick a project in the sidebar to log time.
-														</p>
-													</motion.div>
-												{:else if selectedProject}
-													<motion.div
-														key={selectedProject.id}
-														class="flex flex-wrap items-center gap-2"
-														initial={{ opacity: 0, x: 4 }}
-														animate={{ opacity: 1, x: 0 }}
-														exit={{ opacity: 0, x: -4 }}
-														transition={smooth}
-													>
-														<span
-															class="rounded-md bg-muted/60 px-1.5 py-0.5 font-mono text-[0.68rem] text-muted-foreground"
-														>
-															{formatDate(data.today)}
-														</span>
-													</motion.div>
-												{/if}
-											</AnimatePresence>
+										{#if addHourError}
+											<Alert variant="destructive">
+												<AlertDescription>{addHourError}</AlertDescription>
+											</Alert>
+										{/if}
+									</div>
+								</form>
+							</div>
 
-											<motion.div
-												class="flex flex-wrap gap-2"
-												initial={{ opacity: 0 }}
-												animate={{ opacity: 1 }}
-												transition={{ ...smooth, delay: 0.1 }}
-											>
-												<Button
-													type="button"
-													variant="outline"
-													size="sm"
-													disabled={!data.selectedProjectId || workTimer.running}
-													onclick={() => (logOptionsOpen = true)}
-												>
-													<Settings2Icon />
-													Custom entry
-												</Button>
-											</motion.div>
-
-											<WorkTimerPanel
-												timer={workTimer}
-												projectId={timerProjectId}
-												projectName={timerProjectName}
-												canStart={timerCanStart}
-											/>
-
-											<AnimatePresence initial={false}>
-												{#if addHourError}
-													<motion.div
-														initial={{ opacity: 0, y: -4, height: 0 }}
-														animate={{ opacity: 1, y: 0, height: 'auto' }}
-														exit={{ opacity: 0, y: -4, height: 0 }}
-														transition={smooth}
-													>
-														<Alert variant="destructive">
-															<AlertDescription>{addHourError}</AlertDescription>
-														</Alert>
-													</motion.div>
-												{/if}
-											</AnimatePresence>
-										</div>
-									</form>
-								</motion.div>
-
-								{#if data.entries.length === 0}
-									<motion.div
-										class="grid justify-items-center gap-2 rounded-lg border border-dashed border-border/80 px-6 py-8 text-center"
-										initial={{ opacity: 0, y: 4 }}
-										animate={{ opacity: 1, y: 0 }}
-										transition={{ ...smooth, delay: 0.12 }}
-									>
-										<span class="text-muted-foreground/70">
-											<StampIcon class="size-5" />
-										</span>
-										<p class="m-0 text-sm font-medium">Nothing logged yet</p>
-										<p class="m-0 text-sm text-muted-foreground">
-											Hit the stamp to add your first hour.
-										</p>
-									</motion.div>
-								{:else}
-									<EntryList
-										entries={data.entries}
-										today={data.today}
-										showProject={data.showAll}
-										{actionSuffix}
-										editErrorMessage={editEntryError}
-										hourlyRate={data.settings.hourly_rate}
-										currency={data.settings.currency}
-									/>
-								{/if}
+							{#if data.entries.length === 0}
+								<div
+									class="panel-enter grid justify-items-center gap-2 rounded-lg border border-dashed border-border/80 px-6 py-8 text-center"
+									style="--enter-delay: 0.1s"
+								>
+									<span class="text-muted-foreground/70">
+										<StampIcon class="size-5" />
+									</span>
+									<p class="m-0 text-sm font-medium">Nothing logged yet</p>
+									<p class="m-0 text-sm text-muted-foreground">
+										Hit the stamp to add your first hour.
+									</p>
+								</div>
+							{:else}
+								<EntryList
+									entries={data.entries}
+									today={data.today}
+									showProject={data.showAll}
+									{actionSuffix}
+									editErrorMessage={editEntryError}
+									hourlyRate={data.settings.hourly_rate}
+									currency={data.settings.currency}
+								/>
 							{/if}
-						</motion.div>
-					</AnimatePresence>
+						{/if}
+					</div>
 				</div>
 			</div>
 		</Sidebar.Inset>

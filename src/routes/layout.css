@@ -311,7 +311,7 @@
 		height: 100%;
 		border-radius: inherit;
 		background: linear-gradient(90deg, var(--brass-deep), var(--primary));
-		transition: width 0.25s ease;
+		transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 	}
 
 	.sidebar-footer {
@@ -426,6 +426,13 @@
 		opacity: 0.85;
 	}
 
+	@media (hover: none) {
+		.sidebar-footer__action {
+			padding: 0.75rem;
+			font-size: 0.875rem;
+		}
+	}
+
 	.sidebar-project-dot {
 		width: 0.55rem;
 		height: 0.55rem;
@@ -433,11 +440,40 @@
 		border-radius: 999px;
 		background: var(--dot);
 		box-shadow: 0 0 0 0 transparent;
-		transition: box-shadow 0.18s ease;
+		transition:
+			box-shadow 0.22s ease,
+			transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 	}
 
 	.sidebar-project-dot--active {
 		box-shadow: 0 0 0 2px color-mix(in srgb, var(--dot) 35%, transparent);
+		transform: scale(1.18);
+	}
+
+	/* Accent bar that grows out of the edge of whichever row is selected */
+	[data-slot='sidebar-menu-button'] {
+		position: relative;
+	}
+
+	[data-slot='sidebar-menu-button']::before {
+		content: '';
+		position: absolute;
+		left: 0;
+		top: 50%;
+		width: 2px;
+		height: 1.15rem;
+		border-radius: 999px;
+		background: var(--primary);
+		opacity: 0;
+		transform: translateY(-50%) scaleY(0.3);
+		transition:
+			transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+			opacity 0.24s ease;
+	}
+
+	[data-slot='sidebar-menu-button'][data-active='true']::before {
+		opacity: 1;
+		transform: translateY(-50%) scaleY(1);
 	}
 
 	.sidebar-project-hours {
@@ -470,6 +506,31 @@
 		display: grid;
 		place-content: center;
 		gap: 0.1rem;
+		transition:
+			transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+			box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+			opacity 0.2s ease,
+			filter 0.2s ease;
+	}
+
+	.hour-stamp:not(:disabled):hover {
+		transform: translateY(-2px);
+		box-shadow:
+			0 20px 42px oklch(0.8 0.14 80 / 32%),
+			0 0 0 1px oklch(0.8 0.14 80 / 40%),
+			inset 0 2px 0 rgba(255, 255, 255, 0.45),
+			inset 0 -10px 20px rgba(0, 0, 0, 0.2);
+	}
+
+	/* Pressed like a real punch clock: the die sinks and its drop shadow collapses under it */
+	.hour-stamp:not(:disabled):active {
+		transform: translateY(4px) scale(0.985);
+		box-shadow:
+			0 3px 8px oklch(0.8 0.14 80 / 20%),
+			0 0 0 1px oklch(0.8 0.14 80 / 34%),
+			inset 0 1px 0 rgba(255, 255, 255, 0.22),
+			inset 0 -4px 14px rgba(0, 0, 0, 0.34);
+		transition-duration: 0.07s;
 	}
 
 	.hour-stamp:disabled {
@@ -485,6 +546,65 @@
 		border: 2px dashed color-mix(in srgb, #1a1408 30%, transparent);
 		border-radius: 50%;
 		pointer-events: none;
+		transition:
+			transform 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+			border-color 0.3s ease;
+	}
+
+	/* The dashed ring winds round as you reach for the stamp */
+	.hour-stamp:not(:disabled):hover .hour-stamp__ring {
+		transform: rotate(20deg);
+		border-color: color-mix(in srgb, #1a1408 44%, transparent);
+	}
+
+	.hour-stamp:not(:disabled):active .hour-stamp__ring {
+		transform: rotate(32deg) scale(0.96);
+		transition-duration: 0.12s;
+	}
+
+	/* Impact ring thrown off when an hour lands */
+	.hour-stamp__shock {
+		position: absolute;
+		inset: 0;
+		border-radius: 50%;
+		border: 2px solid var(--primary);
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.hour-stamp--stamped {
+		animation: stamp-recoil 0.52s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.hour-stamp--stamped .hour-stamp__shock {
+		animation: stamp-shock 0.72s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	@keyframes stamp-recoil {
+		0% {
+			transform: scale(1);
+		}
+		22% {
+			transform: scale(0.93);
+			filter: brightness(1.22);
+		}
+		56% {
+			transform: scale(1.04);
+		}
+		100% {
+			transform: scale(1);
+		}
+	}
+
+	@keyframes stamp-shock {
+		from {
+			opacity: 0.7;
+			transform: scale(1);
+		}
+		to {
+			opacity: 0;
+			transform: scale(1.62);
+		}
 	}
 
 	.hour-stamp__hours {
@@ -541,6 +661,11 @@
 		color: var(--muted-foreground);
 	}
 
+	.profile-screen__eyebrow svg {
+		width: 0.75rem;
+		height: 0.75rem;
+	}
+
 	.profile-screen__title {
 		margin: 0;
 		font-family: var(--font-display);
@@ -560,47 +685,63 @@
 		color: var(--destructive);
 	}
 
+	/* `--profile-tile` is the single source of truth for the picker's geometry:
+	   avatars, the add tile and the grid columns all derive from it. */
 	.profile-grid {
+		--profile-tile: 7rem;
+		--profile-radius: 1.25rem;
+		--profile-edit: 1.85rem;
+
 		display: flex;
 		flex-wrap: wrap;
 		justify-content: center;
-		gap: 1.5rem 1.75rem;
+		gap: 1.75rem 1.5rem;
 		margin-top: 2.75rem;
 	}
 
 	.profile-grid__item {
 		position: relative;
-		width: 8.5rem;
+		width: var(--profile-tile);
 	}
 
-	.profile-card__avatar-wrap {
-		display: grid;
-		place-items: center;
+	@media (max-width: 640px) {
+		.profile-grid {
+			--profile-tile: 5.5rem;
+			--profile-radius: 1rem;
+
+			gap: 1.35rem 1.1rem;
+			margin-top: 2rem;
+		}
 	}
 
 	.profile-card__edit {
 		position: absolute;
-		top: 0.15rem;
-		right: 0.15rem;
+		top: calc(var(--profile-edit) / -3);
+		right: calc(var(--profile-edit) / -3);
 		display: grid;
 		place-items: center;
-		width: 1.75rem;
-		height: 1.75rem;
+		width: var(--profile-edit);
+		height: var(--profile-edit);
 		border: 1px solid var(--border);
 		border-radius: 999px;
 		background: var(--card);
 		color: var(--muted-foreground);
 		cursor: pointer;
 		opacity: 0;
-		transform: scale(0.92);
+		transform: scale(0.9);
 		transition:
-			opacity 0.18s ease,
-			transform 0.18s ease,
-			color 0.18s ease,
-			background 0.18s ease;
+			opacity 0.2s ease,
+			transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+			color 0.2s ease,
+			background 0.2s ease;
 	}
 
-	.profile-card__edit--visible,
+	.profile-card__edit svg {
+		width: calc(var(--profile-edit) * 0.46);
+		height: calc(var(--profile-edit) * 0.46);
+	}
+
+	.profile-grid__item:hover .profile-card__edit,
 	.profile-card__edit:focus-visible {
 		opacity: 1;
 		transform: scale(1);
@@ -611,13 +752,25 @@
 		background: var(--accent);
 	}
 
+	/* Touch devices never fire hover, so the edit affordance must stay visible */
+	@media (hover: none) {
+		.profile-grid {
+			--profile-edit: 2.25rem;
+		}
+
+		.profile-card__edit {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+
 	.profile-card {
 		display: grid;
+		justify-items: center;
 		gap: 0.85rem;
 		width: 100%;
 		padding: 0;
 		border: 0;
-		border-radius: var(--radius-lg);
 		background: transparent;
 		color: inherit;
 		cursor: pointer;
@@ -625,34 +778,25 @@
 	}
 
 	.profile-card:focus-visible {
-		outline: 2px solid var(--ring);
-		outline-offset: 6px;
+		outline: none;
 	}
 
 	.profile-card__name {
-		font-size: 0.95rem;
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		overflow: hidden;
+		font-size: 0.9rem;
 		font-weight: 500;
+		line-height: 1.3;
+		opacity: 0.72;
+		transition: opacity 0.22s ease;
 	}
 
-	.profile-card__add-icon {
-		display: grid;
-		place-items: center;
-		width: 7rem;
-		height: 7rem;
-		margin: 0 auto;
-		border: 1px dashed oklch(0.93 0.02 85 / 20%);
-		border-radius: 1rem;
-		background: oklch(0.93 0.02 85 / 3%);
-		color: var(--muted-foreground);
-		transition:
-			background 0.2s ease,
-			color 0.2s ease;
-	}
-
-	.profile-card--add:hover .profile-card__add-icon,
-	.profile-card--add:focus-visible .profile-card__add-icon {
-		background: oklch(0.8 0.14 80 / 9%);
-		color: var(--primary);
+	.profile-card:hover .profile-card__name,
+	.profile-card:focus-visible .profile-card__name {
+		opacity: 1;
 	}
 
 	.profile-avatar {
@@ -679,14 +823,70 @@
 			inset 0 1px 0 rgba(255, 255, 255, 0.28);
 	}
 
+	/* Both tile kinds share geometry so the grid stays on one rhythm. Must follow
+	   `.profile-avatar`, which sets a competing radius and transition. */
+	.profile-avatar--tile,
+	.profile-card__add-icon {
+		width: var(--profile-tile);
+		height: var(--profile-tile);
+		border-radius: var(--profile-radius);
+		transition:
+			transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+			box-shadow 0.24s ease,
+			border-color 0.24s ease,
+			background 0.24s ease,
+			color 0.24s ease;
+	}
+
+	.profile-avatar--tile {
+		font-size: calc(var(--profile-tile) * 0.34);
+	}
+
+	.profile-card__add-icon {
+		display: grid;
+		place-items: center;
+		border: 1px dashed oklch(0.93 0.02 85 / 22%);
+		background: oklch(0.93 0.02 85 / 3%);
+		color: var(--muted-foreground);
+	}
+
+	.profile-card__add-icon svg {
+		width: calc(var(--profile-tile) * 0.28);
+		height: calc(var(--profile-tile) * 0.28);
+	}
+
 	/* Netflix-style selection ring: a gap in the page colour, then a bright edge */
-	.profile-card:hover .profile-avatar,
-	.profile-card:focus-visible .profile-avatar {
+	.profile-card:hover .profile-avatar--tile,
+	.profile-card:focus-visible .profile-avatar--tile {
 		box-shadow:
 			0 16px 34px color-mix(in srgb, var(--avatar-color) 38%, transparent),
 			inset 0 1px 0 rgba(255, 255, 255, 0.3),
 			0 0 0 3px var(--background),
 			0 0 0 5px oklch(0.93 0.02 85 / 72%);
+	}
+
+	.profile-card--add:hover .profile-card__add-icon,
+	.profile-card--add:focus-visible .profile-card__add-icon {
+		border-color: oklch(0.8 0.14 80 / 55%);
+		background: oklch(0.8 0.14 80 / 9%);
+		color: var(--primary);
+		box-shadow:
+			0 0 0 3px var(--background),
+			0 0 0 5px oklch(0.93 0.02 85 / 72%);
+	}
+
+	/* Lift and press are keyed off the card so both tile kinds move identically */
+	.profile-card:hover .profile-avatar--tile,
+	.profile-card:focus-visible .profile-avatar--tile,
+	.profile-card--add:hover .profile-card__add-icon,
+	.profile-card--add:focus-visible .profile-card__add-icon {
+		transform: translateY(-5px) scale(1.05);
+	}
+
+	.profile-card:active .profile-avatar--tile,
+	.profile-card--add:active .profile-card__add-icon {
+		transform: translateY(-1px) scale(0.99);
+		transition-duration: 0.08s;
 	}
 
 	.profile-avatar__initials {
@@ -779,6 +979,20 @@
 		border-radius: calc(var(--radius) - 2px);
 		background: color-mix(in srgb, var(--destructive) 8%, var(--card));
 		overflow: hidden;
+		/* Breathes while the confirmation window is closing */
+		animation: check-urgent 1.6s ease-in-out infinite;
+	}
+
+	@keyframes check-urgent {
+		0%,
+		100% {
+			border-color: color-mix(in srgb, var(--destructive) 35%, var(--border));
+			box-shadow: 0 0 0 0 color-mix(in srgb, var(--destructive) 0%, transparent);
+		}
+		50% {
+			border-color: color-mix(in srgb, var(--destructive) 62%, var(--border));
+			box-shadow: 0 0 0 4px color-mix(in srgb, var(--destructive) 12%, transparent);
+		}
 	}
 
 	.work-timer__check-text {
@@ -820,9 +1034,76 @@
 		color: var(--destructive);
 	}
 
+	/* CSS-driven entrance. Unlike a JS animation it always settles on its final
+	   state, so a panel can never be left stuck at opacity 0. */
+	.panel-enter {
+		animation: panel-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+		animation-delay: var(--enter-delay, 0s);
+	}
+
+	@keyframes panel-enter {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+
+	/* Entrance for the profile picker. CSS rather than JS so the only screen the
+	   user can act on can never be left stranded mid-animation. */
+	.tile-enter {
+		animation: tile-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+		animation-delay: var(--enter-delay, 0s);
+	}
+
+	@keyframes tile-enter {
+		from {
+			opacity: 0;
+			transform: scale(0.94) translateY(8px);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+
+	/* Rolls a changed figure into place like an odometer wheel. Applied via a
+	   keyed block so it replays whenever the underlying number changes. */
+	.value-tick {
+		display: inline-block;
+		animation: value-tick 0.44s cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	@keyframes value-tick {
+		from {
+			opacity: 0;
+			transform: translateY(-0.45em);
+		}
+		to {
+			opacity: 1;
+			transform: none;
+		}
+	}
+
 	@media (prefers-reduced-motion: reduce) {
-		.work-timer__pulse {
+		.work-timer__pulse,
+		.work-timer__check,
+		.panel-enter,
+		.tile-enter,
+		.value-tick,
+		.hour-stamp--stamped,
+		.hour-stamp--stamped .hour-stamp__shock {
 			animation: none;
 		}
+	}
+}
+
+/* Unlayered so it outranks the Tailwind utilities baked into the sidebar variants */
+@media (hover: none) {
+	[data-slot='sidebar-menu-button'][data-size='default'] {
+		height: 2.5rem;
 	}
 }
