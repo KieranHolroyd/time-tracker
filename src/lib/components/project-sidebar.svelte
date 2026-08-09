@@ -321,4 +321,4 @@
 	project={archivingProject}
 	{selectedProjectId}
 />
-<ExportDialog bind:open={exportOpen} {projects} {selectedProjectId} {showAll} />
+<ExportDialog bind:open={exportOpen} {projects} {selectedProjectId} {showAll} {today} />

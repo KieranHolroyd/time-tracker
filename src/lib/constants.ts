@@ -1,3 +1,5 @@
+import { dev } from '$app/environment';
+
 export const PROJECT_COLORS = [
 	'#e8a838',
 	'#6eb5a0',
@@ -30,11 +32,20 @@ export const PROFILE_COLORS = [
 
 export const PROFILE_COOKIE = 'hourmark_profile';
 
-/** Presence check interval while the work timer is running. */
-export const TIMER_CHECK_INTERVAL_MS = 15 * 60 * 1000;
+/**
+ * Presence check interval while the work timer is running. Development drops to
+ * 10s so the notification flow can be exercised without a 15 minute wait.
+ */
+export const TIMER_CHECK_INTERVAL_MS = dev ? 10 * 1000 : 15 * 60 * 1000;
 
 /** How long the user has to confirm a presence check. */
 export const TIMER_CHECK_TIMEOUT_MS = 30 * 1000;
+
+/**
+ * How long to wait before re-attempting a check that could not be delivered,
+ * e.g. notifications are blocked and the tab is in the background.
+ */
+export const TIMER_CHECK_RETRY_MS = dev ? 5 * 1000 : 60 * 1000;
 
 export const TIMER_STORAGE_KEY = 'hourmark_timer';
 

@@ -82,6 +82,12 @@ export function formatElapsed(ms: number): string {
 	return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+/** Short human label for a delay, e.g. "10s" or "15 min". */
+export function formatInterval(ms: number): string {
+	if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+	return `${Math.round(ms / 60_000)} min`;
+}
+
 /** Convert milliseconds to hours/minutes for logging (minimum 1 minute). */
 export function msToLogParts(ms: number): DurationParts {
 	const totalMinutes = Math.max(1, Math.round(ms / 60_000));
@@ -109,6 +115,11 @@ export function formatDate(iso: string): string {
 /** Longer label for modals and confirmations. */
 export function formatDateLong(iso: string): string {
 	return parseDate(iso).format('dddd, D MMMM YYYY');
+}
+
+/** Unambiguous but compact — for ranges and report tables. */
+export function formatDateMedium(iso: string): string {
+	return parseDate(iso).format('D MMM YYYY');
 }
 
 /** "Today" / "Yesterday" where it applies, otherwise a short date. */

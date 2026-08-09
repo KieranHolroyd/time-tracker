@@ -1,8 +1,14 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import './layout.css';
-	import favicon from '$lib/assets/favicon.svg';
+	import favicon from '$lib/assets/favicon.ico';
+	import { ensureNotificationsReady } from '$lib/notifications';
 
 	let { children } = $props();
+
+	onMount(() => {
+		void ensureNotificationsReady();
+	});
 </script>
 
 <svelte:head>

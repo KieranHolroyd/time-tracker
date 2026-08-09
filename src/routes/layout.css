@@ -314,6 +314,46 @@
 		transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 	}
 
+	/* `white-space: pre` is load-bearing — the report aligns its tables with
+	   padding, so any wrapping would break them. */
+	.export-preview {
+		margin: 0;
+		max-height: 20rem;
+		overflow: auto;
+		overscroll-behavior: contain;
+		padding: 0.75rem 0.85rem;
+		border: 1px solid var(--border);
+		border-radius: calc(var(--radius) - 2px);
+		background: oklch(0.14 0.012 250 / 70%);
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		line-height: 1.55;
+		white-space: pre;
+		color: color-mix(in srgb, var(--foreground) 78%, transparent);
+	}
+
+	.export-preview--status {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		max-height: none;
+		white-space: normal;
+		font-size: 0.8125rem;
+		color: var(--muted-foreground);
+	}
+
+	.export-preview--error {
+		border-color: color-mix(in srgb, var(--destructive) 40%, var(--border));
+		color: var(--destructive);
+	}
+
+	@media (max-width: 640px) {
+		.export-preview {
+			max-height: 14rem;
+			font-size: 0.55rem;
+		}
+	}
+
 	.sidebar-footer {
 		padding: 0.75rem;
 	}

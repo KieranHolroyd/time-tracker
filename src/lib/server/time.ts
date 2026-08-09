@@ -188,12 +188,23 @@ export async function archiveProject(id: number, profileId: number): Promise<voi
 
 export async function listEntries(
 	profileId: number,
-	options: { projectId?: number; limit?: number; notesOnly?: boolean } = {}
+	options: {
+		projectId?: number;
+		limit?: number;
+		notesOnly?: boolean;
+		/** Inclusive YYYY-MM-DD bounds; worked_on sorts lexicographically. */
+		from?: string;
+		to?: string;
+	} = {}
 ): Promise<TimeEntry[]> {
 	const db = await ensureSchema();
-	const { projectId, limit = 100, notesOnly = false } = options;
+	const { projectId, limit = 100, notesOnly = false, from, to } = options;
+
+	// Order must match the placeholders below.
 	const args: (string | number)[] = [profileId];
 	if (projectId) args.push(projectId);
+	if (from) args.push(from);
+	if (to) args.push(to);
 	if (limit > 0) args.push(limit);
 
 	const result = await db.execute({
@@ -211,6 +222,8 @@ export async function listEntries(
 		JOIN project_profiles pp ON pp.project_id = p.id AND pp.profile_id = ?
 		WHERE p.archived_at IS NULL
 			${projectId ? 'AND e.project_id = ?' : ''}
+			${from ? 'AND e.worked_on >= ?' : ''}
+			${to ? 'AND e.worked_on <= ?' : ''}
 			${notesOnly ? "AND e.comment IS NOT NULL AND TRIM(e.comment) != ''" : ''}
 		ORDER BY e.worked_on DESC, e.created_at DESC
 		${limit > 0 ? 'LIMIT ?' : ''}`,

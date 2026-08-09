@@ -3,14 +3,18 @@ import { browser } from '$app/environment';
 import { deserialize } from '$app/forms';
 import {
 	TIMER_CHECK_INTERVAL_MS,
+	TIMER_CHECK_RETRY_MS,
 	TIMER_CHECK_TIMEOUT_MS
 } from '$lib/constants';
-import { formatElapsed, msOnPresenceTimeout, msToLogParts } from '$lib/format';
+import { formatDuration, formatElapsed, msOnPresenceTimeout, msToLogParts } from '$lib/format';
 import {
-	closePresenceNotification,
+	closePresenceNotifications,
+	ensureNotificationsReady,
 	getNotificationSupport,
 	requestNotificationPermission,
+	setPresenceConfirmHandler,
 	showPresenceNotification,
+	showTimeoutNotification,
 	type NotificationSupport
 } from '$lib/notifications';
 import {
@@ -37,7 +41,11 @@ export class WorkTimer {
 	#tickId: ReturnType<typeof setInterval> | null = null;
 	#checkId: ReturnType<typeof setTimeout> | null = null;
 	#deadlineId: ReturnType<typeof setTimeout> | null = null;
-	#activeNotification: Notification | null = null;
+	#notificationShown = false;
+	#permissionStatus: PermissionStatus | null = null;
+	#onPermissionChange = () => {
+		this.#permission = getNotificationSupport();
+	};
 
 	#options: WorkTimerOptions;
 
@@ -74,6 +82,11 @@ export class WorkTimer {
 		return this.#permission;
 	}
 
+	/** True when check-ins are paused because nothing can reach the user. */
+	get checksPaused() {
+		return this.#permission === 'denied' || this.#permission === 'unsupported';
+	}
+
 	get error() {
 		return this.#error;
 	}
@@ -92,18 +105,26 @@ export class WorkTimer {
 
 		return untrack(() => {
 			this.#permission = getNotificationSupport();
+			void ensureNotificationsReady();
+			setPresenceConfirmHandler(() => this.confirmPresence());
+			this.#watchPermission();
 			this.#restore(profileId);
 			this.#tickId = setInterval(() => this.#onTick(), 1000);
 
+			// Returning to the tab is the moment a deferred check can finally be
+			// raised, and background tabs have their timers throttled, so re-evaluate.
 			const onVisibility = () => {
 				if (document.visibilityState === 'visible') {
-					this.#onTick(true);
+					this.#onTick();
+				} else if (this.#snapshot?.awaitingCheck && !this.#notificationShown) {
+					void this.#raiseCheck();
 				}
 			};
 			document.addEventListener('visibilitychange', onVisibility);
 
 			return () => {
 				document.removeEventListener('visibilitychange', onVisibility);
+				setPresenceConfirmHandler(null);
 				this.destroy();
 			};
 		});
@@ -112,17 +133,21 @@ export class WorkTimer {
 	destroy() {
 		if (this.#tickId) clearInterval(this.#tickId);
 		this.#clearScheduledChecks();
-		closePresenceNotification(this.#activeNotification);
-		this.#activeNotification = null;
+		void closePresenceNotifications();
+		this.#notificationShown = false;
+		this.#permissionStatus?.removeEventListener('change', this.#onPermissionChange);
+		this.#permissionStatus = null;
 	}
 
 	async start(projectId: number, projectName: string) {
 		this.#error = null;
 
-		const permission = await requestNotificationPermission();
-		this.#permission = permission;
-
+		// Taken before the permission prompt, which can sit on screen for a while —
+		// the clock should run from the moment the user pressed start.
 		const startedAt = Date.now();
+
+		this.#permission = await requestNotificationPermission();
+
 		this.#snapshot = {
 			profileId: this.#options.getProfileId(),
 			projectId,
@@ -153,8 +178,8 @@ export class WorkTimer {
 			nextCheckAt: Date.now() + TIMER_CHECK_INTERVAL_MS
 		};
 		this.#persist();
-		closePresenceNotification(this.#activeNotification);
-		this.#activeNotification = null;
+		void closePresenceNotifications();
+		this.#notificationShown = false;
 		this.#clearDeadline();
 		this.#scheduleNextCheck();
 	}
@@ -172,16 +197,33 @@ export class WorkTimer {
 				return;
 			}
 
-			this.#activeNotification = showPresenceNotification(
-				stored.projectName,
-				() => this.confirmPresence()
-			);
-			this.#deadlineId = setTimeout(() => this.#handleTimeout(), remaining);
+			this.#deadlineId = setTimeout(() => void this.#handleTimeout(), remaining);
+			void this.#raiseCheck();
 		} else {
 			this.#scheduleNextCheck();
 		}
 
-		this.#onTick(true);
+		this.#onTick();
+	}
+
+	/**
+	 * Permission can be changed in browser settings while the page is open, which
+	 * fires no Notification-level event. Without this the UI keeps warning about
+	 * blocked notifications after the user has allowed them.
+	 */
+	#watchPermission() {
+		if (!navigator.permissions?.query) return;
+
+		navigator.permissions
+			.query({ name: 'notifications' as PermissionName })
+			.then((status) => {
+				this.#permissionStatus = status;
+				status.addEventListener('change', this.#onPermissionChange);
+			})
+			.catch(() => {
+				// Firefox historically rejected this query; the polling in #raiseCheck
+				// keeps the value fresh enough without it.
+			});
 	}
 
 	#persist() {
@@ -192,19 +234,25 @@ export class WorkTimer {
 		}
 	}
 
-	#onTick(force = false) {
+	/**
+	 * Backstop for the scheduled timeouts, which browsers throttle heavily (or
+	 * freeze outright) in background tabs. Comparing against wall-clock deadlines
+	 * means a late tick still resolves to the right outcome.
+	 */
+	#onTick() {
 		this.#now = Date.now();
-		if (!this.#snapshot) return;
+		const snapshot = this.#snapshot;
+		if (!snapshot) return;
 
-		if (this.#snapshot.awaitingCheck && this.#snapshot.checkDeadlineAt) {
-			if (this.#now >= this.#snapshot.checkDeadlineAt) {
+		if (snapshot.awaitingCheck && snapshot.checkDeadlineAt) {
+			if (this.#now >= snapshot.checkDeadlineAt) {
 				void this.#handleTimeout();
-				return;
 			}
-		} else if (force || this.#now >= this.#snapshot.nextCheckAt) {
-			if (!this.#snapshot.awaitingCheck && this.#now >= this.#snapshot.nextCheckAt) {
-				this.#triggerCheck();
-			}
+			return;
+		}
+
+		if (this.#now >= snapshot.nextCheckAt) {
+			this.#triggerCheck();
 		}
 	}
 
@@ -220,21 +268,49 @@ export class WorkTimer {
 	#triggerCheck() {
 		if (!this.#snapshot || this.#snapshot.awaitingCheck) return;
 
-		const deadline = Date.now() + TIMER_CHECK_TIMEOUT_MS;
+		this.#clearScheduledChecks();
+		void this.#beginCheck();
+	}
+
+	async #beginCheck() {
+		if (!this.#snapshot || this.#snapshot.awaitingCheck) return;
+
+		const delivered = await this.#raiseCheck();
+		if (!this.#snapshot || this.#snapshot.awaitingCheck) return;
+
+		if (!delivered) {
+			// The alert went nowhere, so starting the countdown would discard the
+			// user's session without them ever being asked. Defer and try again.
+			this.#snapshot = {
+				...this.#snapshot,
+				nextCheckAt: Date.now() + TIMER_CHECK_RETRY_MS
+			};
+			this.#persist();
+			this.#scheduleNextCheck();
+			return;
+		}
+
 		this.#snapshot = {
 			...this.#snapshot,
 			awaitingCheck: true,
-			checkDeadlineAt: deadline
+			checkDeadlineAt: Date.now() + TIMER_CHECK_TIMEOUT_MS
 		};
 		this.#persist();
 
-		closePresenceNotification(this.#activeNotification);
-		this.#activeNotification = showPresenceNotification(
-			this.#snapshot.projectName,
-			() => this.confirmPresence()
-		);
+		this.#deadlineId = setTimeout(() => void this.#handleTimeout(), TIMER_CHECK_TIMEOUT_MS);
+	}
 
-		this.#deadlineId = setTimeout(() => this.#handleTimeout(), TIMER_CHECK_TIMEOUT_MS);
+	/** Puts the check in front of the user. False when it could not be delivered. */
+	async #raiseCheck(): Promise<boolean> {
+		if (!this.#snapshot) return false;
+
+		this.#permission = getNotificationSupport();
+		const notificationShown = await showPresenceNotification(this.#snapshot.projectName);
+		this.#notificationShown = notificationShown;
+
+		// An on-screen page counts: the panel shows the same prompt and countdown,
+		// so the user can answer even with notifications turned off.
+		return notificationShown || document.visibilityState === 'visible';
 	}
 
 	async #handleTimeout() {
@@ -242,10 +318,14 @@ export class WorkTimer {
 
 		const ms = msOnPresenceTimeout(this.#snapshot.startedAt);
 		const projectName = this.#snapshot.projectName;
+		const { hours, minutes } = msToLogParts(ms);
+
 		await this.#finish(ms, `Timer session (no response)`);
 
 		if (ms > 0) {
 			this.#error = `Timer stopped — no response to the check-in for ${projectName}.`;
+			// They missed the check, so they are likely still away from the page.
+			showTimeoutNotification(projectName, formatDuration(hours + minutes / 60));
 		}
 	}
 
@@ -254,8 +334,8 @@ export class WorkTimer {
 
 		const { projectId } = this.#snapshot;
 		this.#clearScheduledChecks();
-		closePresenceNotification(this.#activeNotification);
-		this.#activeNotification = null;
+		void closePresenceNotifications();
+		this.#notificationShown = false;
 		this.#snapshot = null;
 		this.#persist();
 
