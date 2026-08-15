@@ -1,17 +1,26 @@
 import { error, redirect, type Handle } from '@sveltejs/kit';
+import { sequence } from '@sveltejs/kit/hooks';
 import { PERMISSIONS, can } from '$lib/auth/claims';
 import { registerApplication } from '$lib/server/auth/register';
 import { readSession } from '$lib/server/auth/session';
 import { ensureProfileForSubject } from '$lib/server/profile';
+import { telemetryHandle } from '$lib/server/telemetry';
 
 /** Reachable signed out — the sign-in flow itself, and the two dead ends it can land on. */
-const PUBLIC_PATHS = ['/auth/login', '/auth/callback', '/auth/logout', '/auth/error', '/no-access'];
+const PUBLIC_PATHS = [
+	'/auth/login',
+	'/auth/callback',
+	'/auth/logout',
+	'/auth/signed-out',
+	'/auth/error',
+	'/no-access'
+];
 
 // Registration is idempotent and runs once per process; kicked off at startup so
 // the first sign-in does not wait on it.
 void registerApplication();
 
-export const handle: Handle = async ({ event, resolve }) => {
+const authHandle: Handle = async ({ event, resolve }) => {
 	const session = await readSession(event.cookies);
 
 	event.locals.session = session;
@@ -38,3 +47,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	return resolve(event);
 };
+
+// Telemetry goes first so its span covers the session and profile lookups too,
+// and so redirects out of this hook still produce a named span.
+export const handle = sequence(telemetryHandle, authHandle);

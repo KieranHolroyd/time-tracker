@@ -19,6 +19,13 @@ services:
       APP_REGISTRATION_TOKEN: "${APP_REGISTRATION_TOKEN:-}"
       AUTH_CLIENT_ID: "${AUTH_CLIENT_ID:-}"
       AUTH_CLIENT_SECRET: "${AUTH_CLIENT_SECRET:-}"
+      # --- OpenTelemetry ---
+      # Points at the Alloy collector in the observability stack. Set this to
+      # an empty string to switch telemetry off entirely — the SDK never
+      # starts and the app behaves exactly as it did before.
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT-http://192.168.0.1:4318}"
+      OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-hourmark}"
+      OTEL_SERVICE_VERSION: "${OTEL_SERVICE_VERSION:-}"
     volumes:
       - hourmark-data:/data
     restart: unless-stopped

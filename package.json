@@ -34,6 +34,17 @@
 	"dependencies": {
 		"@humanspeak/svelte-motion": "^0.8.2",
 		"@libsql/client": "^0.17.4",
+		"@opentelemetry/api": "^1.9.1",
+		"@opentelemetry/auto-instrumentations-node": "^0.79.0",
+		"@opentelemetry/exporter-logs-otlp-proto": "^0.221.0",
+		"@opentelemetry/exporter-metrics-otlp-proto": "^0.221.0",
+		"@opentelemetry/exporter-trace-otlp-proto": "^0.221.0",
+		"@opentelemetry/instrumentation": "^0.221.0",
+		"@opentelemetry/resources": "^2.10.0",
+		"@opentelemetry/sdk-logs": "^0.221.0",
+		"@opentelemetry/sdk-metrics": "^2.10.0",
+		"@opentelemetry/sdk-node": "^0.221.0",
+		"@opentelemetry/semantic-conventions": "^1.43.0",
 		"dayjs": "^1.11.21"
 	},
 	"packageManager": "pnpm@9.15.4+sha512.b2dc20e2fc72b3e18848459b37359a32064663e5627a51e4c74b2c29dd8e8e0491483c3abb40789cfd578bf362fb6ba8261b05f0387d76792ed6e23ea3b1b6a0"

@@ -28,6 +28,7 @@ ENV NODE_ENV=production \
 RUN mkdir -p /data
 
 COPY --from=build /app/build ./build
+COPY --from=build /app/otel ./otel
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/node_modules ./node_modules
 COPY docker/entrypoint.sh /entrypoint.sh
@@ -40,4 +41,9 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 	CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["node", "build"]
+
+# --import loads the OpenTelemetry bootstrap ahead of the server so the
+# auto-instrumentations can patch http and the libsql client before SvelteKit
+# imports them. It is inert unless OTEL_EXPORTER_OTLP_ENDPOINT is set, so this
+# image still runs identically with no collector in front of it.
+CMD ["node", "--import", "./otel/instrumentation.mjs", "build"]
