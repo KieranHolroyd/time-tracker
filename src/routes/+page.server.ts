@@ -1,7 +1,7 @@
-import { fail, redirect } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
-import { PROFILE_COOKIE } from '$lib/constants';
-import { createProfile, getProfile, resolveActiveProfileId, updateProfile } from '$lib/server/profile';
+import { fail, redirect, type ActionFailure } from '@sveltejs/kit';
+import type { Actions, PageServerLoad, RequestEvent } from './$types';
+import { PERMISSIONS, can } from '$lib/auth/claims';
+import { claimProfile, createProfile, updateProfile } from '$lib/server/profile';
 import { getProfileSettings, updateProfileSettings } from '$lib/server/settings';
 import { parseDurationInput, parseLoggedDuration } from '$lib/format';
 import {
@@ -17,20 +17,42 @@ import {
 	updateProject
 } from '$lib/server/time';
 
-async function requireProfileId(cookies: { get: (name: string) => string | undefined }) {
-	const profileId = await resolveActiveProfileId(cookies);
-	if (!profileId) throw new Error('PROFILE_REQUIRED');
-	return profileId;
+type Guard =
+	| { ok: true; profileId: number; subject: string }
+	| { ok: false; failure: ActionFailure<{ action: string; message: string }> };
+
+/** Refusals travel in the same `{ action, message }` shape every action returns. */
+function refusal(action: string, message: string): Guard {
+	return { ok: false, failure: fail(403, { action, message }) };
+}
+
+/**
+ * Every write goes through here. `hooks.server.ts` has already established that
+ * there is a session with read access, so what is left to check is write access
+ * and whether this account has a ledger to write to yet.
+ */
+function requireWritableProfile({ locals }: RequestEvent, action: string): Guard {
+	const { session, profile } = locals;
+
+	if (!session) return refusal(action, 'Your session has expired — reload to sign in');
+	if (!can(session.user, PERMISSIONS.write)) {
+		return refusal(action, 'Your access to Hourmark is read-only');
+	}
+	if (!profile) return refusal(action, 'Choose a profile first');
+
+	return { ok: true, profileId: profile.id, subject: session.subject };
 }
 
 export const load: PageServerLoad = async ({ url, parent }) => {
-	const { activeProfileId, profiles } = await parent();
+	const { profile, unclaimedProfiles, user } = await parent();
 
-	if (!activeProfileId) {
+	if (!profile) {
 		return {
 			needsProfile: true as const,
-			profiles,
+			unclaimedProfiles,
+			profile: null,
 			activeProfileId: null,
+			canWrite: false,
 			projects: [],
 			entries: [],
 			summary: { today: 0, week: 0, total: 0 },
@@ -42,6 +64,7 @@ export const load: PageServerLoad = async ({ url, parent }) => {
 		};
 	}
 
+	const activeProfileId = profile.id;
 	const projects = await listProjectsWithStats(activeProfileId);
 	const requested = url.searchParams.get('project');
 	const showAll = requested === 'all';
@@ -61,8 +84,10 @@ export const load: PageServerLoad = async ({ url, parent }) => {
 
 	return {
 		needsProfile: false as const,
-		profiles,
+		unclaimedProfiles,
+		profile,
 		activeProfileId,
+		canWrite: can(user ?? { permissions: [] }, PERMISSIONS.write),
 		projects,
 		entries,
 		summary,
@@ -75,41 +100,43 @@ export const load: PageServerLoad = async ({ url, parent }) => {
 };
 
 export const actions: Actions = {
-	selectProfile: async ({ request, cookies }) => {
-		const form = await request.formData();
+	/** Take over a ledger that predates sign-in. */
+	claimProfile: async (event) => {
+		const { session } = event.locals;
+		if (!session) {
+			return fail(401, { action: 'claimProfile', message: 'Your session has expired — reload to sign in' });
+		}
+		if (event.locals.profile) redirect(303, '/');
+
+		const form = await event.request.formData();
 		const profileId = Number(form.get('profileId'));
 
 		if (!profileId) {
-			return fail(400, { action: 'selectProfile', message: 'Choose a profile' });
+			return fail(400, { action: 'claimProfile', message: 'Choose a profile' });
 		}
 
-		const profile = await getProfile(profileId);
-		if (!profile) {
-			return fail(400, { action: 'selectProfile', message: 'Profile not found' });
+		try {
+			await claimProfile(profileId, session.subject);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : 'Could not open that profile';
+			return fail(400, { action: 'claimProfile', message });
 		}
 
-		cookies.set(PROFILE_COOKIE, String(profileId), {
-			path: '/',
-			maxAge: 60 * 60 * 24 * 365,
-			httpOnly: true,
-			sameSite: 'lax'
-		});
-
-		throw redirect(303, '/');
+		redirect(303, '/');
 	},
 
-	createProfile: async ({ request, cookies }) => {
-		const form = await request.formData();
+	createProfile: async (event) => {
+		const { session } = event.locals;
+		if (!session) {
+			return fail(401, { action: 'createProfile', message: 'Your session has expired — reload to sign in' });
+		}
+		if (event.locals.profile) redirect(303, '/');
+
+		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '');
 
 		try {
-			const profile = await createProfile(name);
-			cookies.set(PROFILE_COOKIE, String(profile.id), {
-				path: '/',
-				maxAge: 60 * 60 * 24 * 365,
-				httpOnly: true,
-				sameSite: 'lax'
-			});
+			const profile = await createProfile(name, { subject: session.subject });
 			return { ok: true, action: 'createProfile', profileId: profile.id };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Could not create profile';
@@ -117,43 +144,32 @@ export const actions: Actions = {
 		}
 	},
 
-	updateProfile: async ({ request }) => {
-		const form = await request.formData();
-		const id = Number(form.get('id'));
+	updateProfile: async (event) => {
+		const guard = requireWritableProfile(event, 'updateProfile');
+		if (!guard.ok) return guard.failure;
+
+		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '');
 		const color = String(form.get('color') ?? '');
 
-		if (!id) {
-			return fail(400, { action: 'updateProfile', message: 'Missing profile' });
-		}
-
 		try {
-			await updateProfile(id, { name, color });
-			return { ok: true, action: 'updateProfile', profileId: id };
+			await updateProfile(guard.profileId, guard.subject, { name, color });
+			return { ok: true, action: 'updateProfile', profileId: guard.profileId };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Could not update profile';
-			return fail(400, { action: 'updateProfile', message, profileId: id });
+			return fail(400, { action: 'updateProfile', message, profileId: guard.profileId });
 		}
 	},
 
-	switchProfile: async ({ cookies }) => {
-		cookies.delete(PROFILE_COOKIE, { path: '/' });
-		throw redirect(303, '/');
-	},
+	createProject: async (event) => {
+		const guard = requireWritableProfile(event, 'createProject');
+		if (!guard.ok) return guard.failure;
 
-	createProject: async ({ request, cookies }) => {
-		let activeProfileId: number;
-		try {
-			activeProfileId = await requireProfileId(cookies);
-		} catch {
-			return fail(400, { action: 'createProject', message: 'Choose a profile first' });
-		}
-
-		const form = await request.formData();
+		const form = await event.request.formData();
 		const name = String(form.get('name') ?? '');
 
 		try {
-			const project = await createProject(name, [activeProfileId]);
+			const project = await createProject(name, [guard.profileId]);
 			return { ok: true, action: 'createProject', projectId: project.id };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Could not create project';
@@ -161,13 +177,11 @@ export const actions: Actions = {
 		}
 	},
 
-	addHour: async ({ request, cookies }) => {
-		const activeProfileId = await resolveActiveProfileId(cookies);
-		if (!activeProfileId) {
-			return fail(400, { action: 'addHour', message: 'Choose a profile first' });
-		}
+	addHour: async (event) => {
+		const guard = requireWritableProfile(event, 'addHour');
+		if (!guard.ok) return guard.failure;
 
-		const form = await request.formData();
+		const form = await event.request.formData();
 		const projectId = Number(form.get('projectId'));
 		const workedOn = String(form.get('workedOn') ?? '').trim();
 		const comment = String(form.get('comment') ?? '');
@@ -185,7 +199,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await addHour(activeProfileId, { projectId, hours, workedOn, comment });
+			await addHour(guard.profileId, { projectId, hours, workedOn, comment });
 			return { ok: true, action: 'addHour' };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Could not log time';
@@ -193,13 +207,11 @@ export const actions: Actions = {
 		}
 	},
 
-	updateEntry: async ({ request, cookies }) => {
-		const activeProfileId = await resolveActiveProfileId(cookies);
-		if (!activeProfileId) {
-			return fail(400, { action: 'updateEntry', message: 'Choose a profile first' });
-		}
+	updateEntry: async (event) => {
+		const guard = requireWritableProfile(event, 'updateEntry');
+		if (!guard.ok) return guard.failure;
 
-		const form = await request.formData();
+		const form = await event.request.formData();
 		const id = Number(form.get('id'));
 		const comment = String(form.get('comment') ?? '');
 
@@ -216,7 +228,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await updateEntry(id, activeProfileId, { hours, comment });
+			await updateEntry(id, guard.profileId, { hours, comment });
 			return { ok: true, action: 'updateEntry' };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Could not update entry';
@@ -224,13 +236,11 @@ export const actions: Actions = {
 		}
 	},
 
-	deleteEntry: async ({ request, cookies }) => {
-		const activeProfileId = await resolveActiveProfileId(cookies);
-		if (!activeProfileId) {
-			return fail(400, { action: 'deleteEntry', message: 'Choose a profile first' });
-		}
+	deleteEntry: async (event) => {
+		const guard = requireWritableProfile(event, 'deleteEntry');
+		if (!guard.ok) return guard.failure;
 
-		const form = await request.formData();
+		const form = await event.request.formData();
 		const id = Number(form.get('id'));
 
 		if (!id) {
@@ -238,7 +248,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await deleteEntry(id, activeProfileId);
+			await deleteEntry(id, guard.profileId);
 			return { ok: true, action: 'deleteEntry' };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Could not delete entry';
@@ -246,13 +256,11 @@ export const actions: Actions = {
 		}
 	},
 
-	updateProject: async ({ request, cookies }) => {
-		const activeProfileId = await resolveActiveProfileId(cookies);
-		if (!activeProfileId) {
-			return fail(400, { action: 'updateProject', message: 'Choose a profile first' });
-		}
+	updateProject: async (event) => {
+		const guard = requireWritableProfile(event, 'updateProject');
+		if (!guard.ok) return guard.failure;
 
-		const form = await request.formData();
+		const form = await event.request.formData();
 		const id = Number(form.get('id'));
 		const name = String(form.get('name') ?? '');
 		const color = String(form.get('color') ?? '');
@@ -262,7 +270,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await updateProject(id, activeProfileId, {
+			await updateProject(id, guard.profileId, {
 				name: name || undefined,
 				color: color || undefined
 			});
@@ -273,13 +281,11 @@ export const actions: Actions = {
 		}
 	},
 
-	archiveProject: async ({ request, cookies }) => {
-		const activeProfileId = await resolveActiveProfileId(cookies);
-		if (!activeProfileId) {
-			return fail(400, { action: 'archiveProject', message: 'Choose a profile first' });
-		}
+	archiveProject: async (event) => {
+		const guard = requireWritableProfile(event, 'archiveProject');
+		if (!guard.ok) return guard.failure;
 
-		const form = await request.formData();
+		const form = await event.request.formData();
 		const id = Number(form.get('id'));
 
 		if (!id) {
@@ -287,7 +293,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await archiveProject(id, activeProfileId);
+			await archiveProject(id, guard.profileId);
 			return { ok: true, action: 'archiveProject', projectId: id };
 		} catch (error) {
 			const message = error instanceof Error ? error.message : 'Could not archive project';
@@ -295,13 +301,11 @@ export const actions: Actions = {
 		}
 	},
 
-	updateSettings: async ({ request, cookies }) => {
-		const activeProfileId = await resolveActiveProfileId(cookies);
-		if (!activeProfileId) {
-			return fail(400, { action: 'updateSettings', message: 'Choose a profile first' });
-		}
+	updateSettings: async (event) => {
+		const guard = requireWritableProfile(event, 'updateSettings');
+		if (!guard.ok) return guard.failure;
 
-		const form = await request.formData();
+		const form = await event.request.formData();
 		const hourlyRateRaw = String(form.get('hourlyRate') ?? '').trim();
 		const currency = String(form.get('currency') ?? 'GBP');
 		const weeklyGoalRaw = String(form.get('weeklyHoursGoal') ?? '').trim();
@@ -321,7 +325,7 @@ export const actions: Actions = {
 		}
 
 		try {
-			await updateProfileSettings(activeProfileId, {
+			await updateProfileSettings(guard.profileId, {
 				hourly_rate,
 				currency,
 				weekly_hours_goal

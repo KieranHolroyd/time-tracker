@@ -30,7 +30,6 @@ export const PROFILE_COLORS = [
 	'#dda0dd'
 ] as const;
 
-export const PROFILE_COOKIE = 'hourmark_profile';
 
 /**
  * Presence check interval while the work timer is running. Development drops to

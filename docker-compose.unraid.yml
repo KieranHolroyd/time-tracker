@@ -11,5 +11,9 @@ services:
       ORIGIN: "${ORIGIN:?Set ORIGIN to http://YOUR_UNRAID_IP:3000}"
       TURSO_DATABASE_URL: "${TURSO_DATABASE_URL:-file:/data/hourmark.db}"
       TURSO_AUTH_TOKEN: "${TURSO_AUTH_TOKEN:-}"
+      AUTH_ISSUER: "${AUTH_ISSUER:-https://auth.holroydnet.uk}"
+      APP_REGISTRATION_TOKEN: "${APP_REGISTRATION_TOKEN:-}"
+      AUTH_CLIENT_ID: "${AUTH_CLIENT_ID:-}"
+      AUTH_CLIENT_SECRET: "${AUTH_CLIENT_SECRET:-}"
     volumes:
       - /mnt/user/appdata/hourmark:/data

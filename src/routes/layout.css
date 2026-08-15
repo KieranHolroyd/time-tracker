@@ -426,6 +426,73 @@
 		border-top: 1px solid var(--hairline);
 	}
 
+	/* Who you are signed in as, and the way into your own profile. */
+	.sidebar-account {
+		display: flex;
+		align-items: center;
+		gap: 0.55rem;
+		width: 100%;
+		padding: 0.6rem 0.75rem;
+		border: 0;
+		border-top: 1px solid var(--hairline);
+		background: transparent;
+		color: var(--foreground);
+		text-align: left;
+		cursor: pointer;
+		transition: background 0.15s ease;
+	}
+
+	.sidebar-account:hover {
+		background: oklch(0.93 0.02 85 / 4%);
+	}
+
+	.sidebar-account__text {
+		display: grid;
+		min-width: 0;
+		flex: 1;
+		gap: 0.1rem;
+	}
+
+	.sidebar-account__name {
+		font-size: 0.8125rem;
+		font-weight: 600;
+		line-height: 1.1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.sidebar-account__meta {
+		font-family: var(--font-mono);
+		font-size: 0.6rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--muted-foreground);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.sidebar-account svg {
+		width: 0.8rem;
+		height: 0.8rem;
+		flex-shrink: 0;
+		opacity: 0;
+		color: var(--muted-foreground);
+		transition: opacity 0.15s ease;
+	}
+
+	.sidebar-account:hover svg,
+	.sidebar-account:focus-visible svg {
+		opacity: 0.72;
+	}
+
+	@media (hover: none) {
+		.sidebar-account svg {
+			opacity: 0.72;
+		}
+	}
+
 	.sidebar-footer__action {
 		display: flex;
 		align-items: center;
@@ -718,6 +785,15 @@
 		margin: 0.75rem 0 0;
 		color: var(--muted-foreground);
 		font-size: 1rem;
+	}
+
+	/* Buttons on the sign-in dead ends: nothing to do here but leave or retry. */
+	.auth-actions {
+		display: flex;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		margin-top: 2rem;
 	}
 
 	.profile-screen__error {

@@ -54,7 +54,8 @@
 					};
 				}}
 			>
-				<input type="hidden" name="id" value={profile.id} />
+				<!-- No profile id: the server edits whichever ledger the signed-in
+				     account owns, so there is nothing here worth tampering with. -->
 				<input type="hidden" name="color" value={color} />
 
 				<div class="flex justify-center">

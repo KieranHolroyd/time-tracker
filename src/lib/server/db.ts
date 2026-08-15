@@ -68,9 +68,20 @@ export async function ensureSchema(): Promise<Client> {
 				comment TEXT,
 				created_at TEXT NOT NULL DEFAULT (datetime('now'))
 			)`,
+			`CREATE TABLE IF NOT EXISTS auth_sessions (
+				id TEXT PRIMARY KEY,
+				subject TEXT NOT NULL,
+				claims TEXT NOT NULL,
+				access_token TEXT NOT NULL,
+				refresh_token TEXT,
+				access_expires_at INTEGER NOT NULL,
+				expires_at INTEGER NOT NULL,
+				created_at TEXT NOT NULL DEFAULT (datetime('now'))
+			)`,
 			`CREATE INDEX IF NOT EXISTS idx_time_entries_project ON time_entries(project_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_time_entries_worked_on ON time_entries(worked_on)`,
-			`CREATE INDEX IF NOT EXISTS idx_project_profiles_profile ON project_profiles(profile_id)`
+			`CREATE INDEX IF NOT EXISTS idx_project_profiles_profile ON project_profiles(profile_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires ON auth_sessions(expires_at)`
 		],
 		'write'
 	);
@@ -85,9 +96,30 @@ export async function ensureSchema(): Promise<Client> {
 	await migrateExistingProjects(db);
 	await migrateDropProjectNameUnique(db);
 	await migrateProfileSettings(db);
+	await migrateProfileIdentity(db);
 
 	migrated = true;
 	return db;
+}
+
+/**
+ * Ties a profile to the Holroyd ID account that owns it. Nullable on purpose:
+ * profiles that predate sign-in stay unclaimed until their owner signs in and
+ * claims one, which is what keeps existing ledgers reachable.
+ */
+async function migrateProfileIdentity(db: Client) {
+	const columns = (await db.execute('PRAGMA table_info(profiles)')).rows.map((row) =>
+		String(row.name)
+	);
+
+	if (!columns.includes('oidc_subject')) {
+		await db.execute('ALTER TABLE profiles ADD COLUMN oidc_subject TEXT');
+	}
+
+	// One account, one profile — a second claim on the same subject is a bug.
+	await db.execute(
+		'CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_subject ON profiles(oidc_subject) WHERE oidc_subject IS NOT NULL'
+	);
 }
 
 async function migrateProfileSettings(db: Client) {

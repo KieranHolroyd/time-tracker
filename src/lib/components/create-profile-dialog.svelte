@@ -9,17 +9,21 @@
 	type Props = {
 		open?: boolean;
 		errorMessage?: string;
+		/** Prefilled from the signed-in account — most people want their own name. */
+		name?: string;
 	};
 
-	let { open = $bindable(false), errorMessage }: Props = $props();
+	let { open = $bindable(false), errorMessage, name = '' }: Props = $props();
 	let submitting = $state(false);
 </script>
 
 <Dialog.Root bind:open>
 	<Dialog.Content class="sm:max-w-sm">
 		<Dialog.Header>
-			<Dialog.Title>Add profile</Dialog.Title>
-			<Dialog.Description>Create a profile so each person gets their own project list.</Dialog.Description>
+			<Dialog.Title>Start a ledger</Dialog.Title>
+			<Dialog.Description>
+				Your own projects and hours, kept under your Holroyd ID account.
+			</Dialog.Description>
 		</Dialog.Header>
 
 		<form
@@ -44,6 +48,7 @@
 				<Input
 					id="create-profile-name"
 					name="name"
+					value={name}
 					placeholder="e.g. Alex"
 					required
 					class="h-9"

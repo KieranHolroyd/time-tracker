@@ -13,6 +13,12 @@ services:
       # Default: SQLite on the /data volume. Or point at Turso instead.
       TURSO_DATABASE_URL: "${TURSO_DATABASE_URL:-file:/data/hourmark.db}"
       TURSO_AUTH_TOKEN: "${TURSO_AUTH_TOKEN:-}"
+      # Sign-in via Holroyd ID. On a holroydnet.uk hostname the app registers
+      # itself and needs nothing here; ORIGIN above is the redirect URI it uses.
+      AUTH_ISSUER: "${AUTH_ISSUER:-https://auth.holroydnet.uk}"
+      APP_REGISTRATION_TOKEN: "${APP_REGISTRATION_TOKEN:-}"
+      AUTH_CLIENT_ID: "${AUTH_CLIENT_ID:-}"
+      AUTH_CLIENT_SECRET: "${AUTH_CLIENT_SECRET:-}"
     volumes:
       - hourmark-data:/data
     restart: unless-stopped

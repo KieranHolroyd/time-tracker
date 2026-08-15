@@ -97,6 +97,10 @@
 		form?.action === 'updateProfile' ? (form.message as string | undefined) : undefined
 	);
 
+	const claimProfileError = $derived(
+		form?.action === 'claimProfile' ? (form.message as string | undefined) : undefined
+	);
+
 	const editProjectError = $derived(
 		form?.action === 'updateProject' ? (form.message as string | undefined) : undefined
 	);
@@ -144,11 +148,12 @@
 
 {#if data.needsProfile}
 	<ProfileSelector
-		profiles={data.profiles}
+		profiles={data.unclaimedProfiles}
+		user={data.user!}
 		createErrorMessage={createProfileError}
-		editErrorMessage={editProfileError}
+		claimErrorMessage={claimProfileError}
 	/>
-{:else if data.activeProfileId}
+{:else if data.profile && data.user}
 	<Sidebar.Provider style="--sidebar-width: 15rem;" class="h-svh overflow-hidden">
 		<ProjectSidebar
 			projects={data.projects}
@@ -157,10 +162,13 @@
 			overall={data.overall}
 			settings={data.settings}
 			today={data.today}
+			profile={data.profile}
+			user={data.user}
 			bind:createOpen
 			bind:settingsOpen
 			errorMessage={createError}
 			editErrorMessage={editProjectError}
+			profileErrorMessage={editProfileError}
 		/>
 
 		<Sidebar.Inset class="min-w-0 overflow-hidden bg-transparent">

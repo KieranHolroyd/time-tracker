@@ -3,6 +3,8 @@ export type Profile = {
 	name: string;
 	color: string;
 	created_at: string;
+	/** Whether a Holroyd ID account owns this profile. Unclaimed ones can be taken over. */
+	claimed: boolean;
 };
 
 export type Project = {

@@ -2,17 +2,16 @@ import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { isReversedRange, rangeFromParams } from '$lib/date-range';
 import { exportFilename, formatExport } from '$lib/server/export';
-import { getProfile, resolveActiveProfileId } from '$lib/server/profile';
 import { getProfileSettings } from '$lib/server/settings';
 import { listEntries, listProjectsWithStats, todayLocal } from '$lib/server/time';
 
-export const GET: RequestHandler = async ({ url, cookies }) => {
-	const profileId = await resolveActiveProfileId(cookies);
-	if (!profileId) throw error(401, 'Select a profile first');
+// Reading the export needs `hours:read`, which `hooks.server.ts` has already
+// established for every non-public route — so all that is left is the ledger.
+export const GET: RequestHandler = async ({ url, locals }) => {
+	const profile = locals.profile;
+	if (!profile) throw error(401, 'Choose a profile first');
 
-	const profile = await getProfile(profileId);
-	if (!profile) throw error(401, 'Profile not found');
-
+	const profileId = profile.id;
 	const projectParam = url.searchParams.get('project');
 	const projects = await listProjectsWithStats(profileId);
 

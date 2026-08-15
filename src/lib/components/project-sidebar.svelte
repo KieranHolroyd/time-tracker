@@ -10,19 +10,22 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import StampIcon from '@lucide/svelte/icons/stamp';
-	import UsersIcon from '@lucide/svelte/icons/users';
+	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import ArchiveProjectDialog from '$lib/components/archive-project-dialog.svelte';
 	import CreateProjectDialog from '$lib/components/create-project-dialog.svelte';
 	import EarningsHint from '$lib/components/earnings-hint.svelte';
+	import EditProfileDialog from '$lib/components/edit-profile-dialog.svelte';
 	import EditProjectDialog from '$lib/components/edit-project-dialog.svelte';
 	import ExportDialog from '$lib/components/export-dialog.svelte';
+	import ProfileAvatar from '$lib/components/profile-avatar.svelte';
 	import { COLOR_NAMES, PROJECT_COLORS } from '$lib/constants';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { formatDuration } from '$lib/format';
 	import { buildOverallEarningsSummary, hasBillableRate } from '$lib/earnings';
-	import type { ProfileSettings, ProjectWithStats, Summary } from '$lib/types';
+	import type { SessionUser } from '$lib/auth/claims';
+	import type { Profile, ProfileSettings, ProjectWithStats, Summary } from '$lib/types';
 
 	type Props = {
 		projects: ProjectWithStats[];
@@ -31,10 +34,13 @@
 		overall: Summary;
 		settings: ProfileSettings;
 		today: string;
+		profile: Profile;
+		user: SessionUser;
 		createOpen?: boolean;
 		settingsOpen?: boolean;
 		errorMessage?: string;
 		editErrorMessage?: string;
+		profileErrorMessage?: string;
 	};
 
 	let {
@@ -44,12 +50,16 @@
 		overall,
 		settings,
 		today,
+		profile,
+		user,
 		createOpen = $bindable(false),
 		settingsOpen = $bindable(false),
 		errorMessage,
-		editErrorMessage
+		editErrorMessage,
+		profileErrorMessage
 	}: Props = $props();
 
+	let editProfileOpen = $state(false);
 	let editOpen = $state(false);
 	let archiveOpen = $state(false);
 	let exportOpen = $state(false);
@@ -292,6 +302,22 @@
 				</div>
 			{/if}
 
+			<button
+				type="button"
+				class="sidebar-account"
+				onclick={() => (editProfileOpen = true)}
+				title="Edit your profile"
+			>
+				<ProfileAvatar {profile} size="sm" />
+				<span class="sidebar-account__text">
+					<span class="sidebar-account__name">{profile.name}</span>
+					<span class="sidebar-account__meta">
+						{user.username ?? user.name}{user.role ? ` · ${user.role}` : ''}
+					</span>
+				</span>
+				<PencilIcon />
+			</button>
+
 			<div class="sidebar-footer__actions">
 				<button type="button" class="sidebar-footer__action" onclick={() => (settingsOpen = true)}>
 					<SlidersHorizontalIcon />
@@ -301,10 +327,12 @@
 					<DownloadIcon />
 					Export notes
 				</button>
-				<form method="POST" action="?/switchProfile">
+				<!-- A plain POST to the endpoint, so signing out is not something a
+				     stray link or a prefetch can do on the user's behalf. -->
+				<form method="POST" action="/auth/logout">
 					<button type="submit" class="sidebar-footer__action sidebar-footer__action--muted">
-						<UsersIcon />
-						Switch user
+						<LogOutIcon />
+						Sign out
 					</button>
 				</form>
 			</div>
@@ -314,6 +342,7 @@
 	<Sidebar.Rail />
 </Sidebar.Root>
 
+<EditProfileDialog bind:open={editProfileOpen} {profile} errorMessage={profileErrorMessage} />
 <CreateProjectDialog bind:open={createOpen} {errorMessage} />
 <EditProjectDialog bind:open={editOpen} project={editingProject} errorMessage={editErrorMessage} />
 <ArchiveProjectDialog
