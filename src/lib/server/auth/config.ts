@@ -1,6 +1,23 @@
 import { dev } from '$app/environment';
-import { env } from '$env/dynamic/private';
+import { env as dynamicEnv } from '$env/dynamic/private';
 import { APP_SLUG } from '$lib/auth/claims';
+
+/**
+ * Reads a variable, preferring SvelteKit's dynamic env and falling back to
+ * `process.env`.
+ *
+ * Every export below is evaluated at import time, and `$env/dynamic/private`
+ * is not populated until SvelteKit runs `set_private_env` inside `Server.init`.
+ * Normally this module is not reached until after that, so the ordering holds
+ * by luck — and an ESM loader hook breaks the luck. OpenTelemetry's `--import`
+ * bootstrap registers one, which pulls the server module graph in early and
+ * evaluates this file while the dynamic env is still empty. That would throw on
+ * the ORIGIN check below, and silently blank the client credentials above it.
+ * `process.env` is populated before any of that under adapter-node.
+ */
+function read(name: string): string | undefined {
+	return dynamicEnv[name] || process.env[name];
+}
 
 export { APP_SLUG };
 
@@ -11,7 +28,7 @@ function trimUrl(value: string | undefined): string | undefined {
 }
 
 /** The provider. Its discovery document supplies every endpoint we use. */
-export const AUTH_ISSUER = trimUrl(env.AUTH_ISSUER) ?? 'https://auth.holroydnet.uk';
+export const AUTH_ISSUER = trimUrl(read('AUTH_ISSUER')) ?? 'https://auth.holroydnet.uk';
 
 /**
  * Our own public origin. Taken from configuration rather than the incoming
@@ -20,7 +37,7 @@ export const AUTH_ISSUER = trimUrl(env.AUTH_ISSUER) ?? 'https://auth.holroydnet.
  * CSRF checks, so production usually needs nothing new.
  */
 export const APP_ORIGIN =
-	trimUrl(env.APP_ORIGIN) ?? trimUrl(env.ORIGIN) ?? (dev ? 'http://localhost:5173' : undefined);
+	trimUrl(read('APP_ORIGIN')) ?? trimUrl(read('ORIGIN')) ?? (dev ? 'http://localhost:5173' : undefined);
 
 export const CALLBACK_PATH = '/auth/callback';
 
@@ -38,7 +55,7 @@ export function redirectUri(): string {
  * two environments would otherwise fight over the list. Anything in here is sent
  * alongside our own callback.
  */
-export const EXTRA_REDIRECT_URIS = (env.AUTH_EXTRA_REDIRECT_URIS ?? '')
+export const EXTRA_REDIRECT_URIS = (read('AUTH_EXTRA_REDIRECT_URIS') ?? '')
 	.split(',')
 	.map((uri) => uri.trim())
 	.filter(Boolean);
@@ -48,18 +65,18 @@ export const EXTRA_REDIRECT_URIS = (env.AUTH_EXTRA_REDIRECT_URIS ?? '')
  * Prefer leaving it unset: domain registration gives a public client with
  * nothing to store and nothing to rotate.
  */
-export const REGISTRATION_TOKEN = env.APP_REGISTRATION_TOKEN?.trim() || undefined;
+export const REGISTRATION_TOKEN = read('APP_REGISTRATION_TOKEN')?.trim() || undefined;
 
 /** Registration is idempotent by slug, so re-running it on boot is the point. */
-export const REGISTER_ON_BOOT = (env.AUTH_REGISTER_ON_BOOT ?? 'true').toLowerCase() !== 'false';
+export const REGISTER_ON_BOOT = (read('AUTH_REGISTER_ON_BOOT') ?? 'true').toLowerCase() !== 'false';
 
 /**
  * A public client's id is simply the slug, so the default needs no configuration.
  * Only a confidential registration (one made with a registration token) hands
  * back a generated id and a secret, and those two have to be put in the environment.
  */
-export const CLIENT_ID = env.AUTH_CLIENT_ID?.trim() || APP_SLUG;
-export const CLIENT_SECRET = env.AUTH_CLIENT_SECRET?.trim() || undefined;
+export const CLIENT_ID = read('AUTH_CLIENT_ID')?.trim() || APP_SLUG;
+export const CLIENT_SECRET = read('AUTH_CLIENT_SECRET')?.trim() || undefined;
 
 export const SESSION_COOKIE = 'hourmark_session';
 export const FLOW_COOKIE = 'hourmark_auth_flow';
